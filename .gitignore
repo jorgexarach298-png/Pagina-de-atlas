@@ -1,0 +1,9 @@
+node_modules/
+data/atlas.json
+data/atlas.json.tmp
+data/atlas.json.broken-*
+data/session.key
+data/uploads/*
+!data/uploads/.gitkeep
+.env
+*.log

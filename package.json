@@ -1,0 +1,19 @@
+{
+  "name": "atlas-fc27-clubes-pro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web oficial del equipo ATLAS - FC27 Clubes Pro: plantilla, pizarra tactica, check-in e historia",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-session": "^1.18.1"
+  }
+}

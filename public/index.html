@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ATLAS · FC27 Clubes Pro</title>
+<meta name="description" content="Web oficial del club ATLAS en FC 27 Clubes Pro: plantilla, pizarra táctica, check-in e historia." />
+<meta name="theme-color" content="#070b12" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Saira+Condensed:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23070b12'/%3E%3Ctext x='50' y='72' font-size='64' font-family='Georgia,serif' font-weight='bold' fill='%233ef08a' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop__mesh"></div>
+    <div class="backdrop__lines"></div>
+    <div class="backdrop__grain"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="#/inicio" aria-label="ATLAS, ir al inicio">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 48 56" role="img">
+          <path d="M24 2 46 12v20c0 12-10 19-22 22C12 51 2 44 2 32V12L24 2Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M14 20h20M24 20v20M16 40l8-20 8 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <b>ATLAS</b>
+        <i>FC27 · Clubes Pro</i>
+      </span>
+    </a>
+
+    <nav class="nav" id="nav">
+      <a href="#/inicio" data-view="inicio">Inicio</a>
+      <a href="#/plantilla" data-view="plantilla">Plantilla</a>
+      <a href="#/pizarra" data-view="pizarra">Pizarra</a>
+      <a href="#/checkin" data-view="checkin">Check-in</a>
+      <a href="#/historia" data-view="historia">Historia</a>
+    </nav>
+
+    <div class="session" id="session"></div>
+  </header>
+
+  <main id="view" class="view" tabindex="-1"></main>
+
+  <footer class="footer">
+    <p>
+      <strong>ATLAS</strong> · Clubes Pro FC 27 — <span id="footer-tagline">Un escudo, once corazones.</span>
+    </p>
+    <p class="footer__meta">
+      <span id="footer-updated"></span>
+      <span class="dot" aria-hidden="true">•</span>
+      <span id="footer-admin"></span>
+    </p>
+  </footer>
+
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+  <div id="modal-root"></div>
+
+  <script src="/js/app.js" type="module"></script>
+</body>
+</html>
