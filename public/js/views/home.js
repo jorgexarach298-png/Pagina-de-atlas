@@ -132,7 +132,6 @@ export async function renderHome(ctx) {
 }
 
 function renderCheckinSummary(checkin) {
-  const mine = checkin.roster.find((row) => row.status === 'yes') || [];
   const confirmed = checkin.roster.filter((row) => row.status === 'yes');
   const pending = checkin.counts.pending;
 
