@@ -190,6 +190,13 @@ export function fileToSquareDataUrl(file, size = 640) {
   });
 }
 
+/** Lee un parámetro de la parte de consulta del hash (p. ej. #/pizarra?date=...). */
+export function hashParam(name, fallback = '') {
+  const query = location.hash.split('?')[1] || '';
+  const value = new URLSearchParams(query).get(name);
+  return value || fallback;
+}
+
 /** Abre el selector de ficheros y devuelve la data URL cuadrada. */
 export function pickPhoto(size = 640) {
   return new Promise((resolve, reject) => {

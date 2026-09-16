@@ -127,6 +127,43 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+/**
+ * Registro de un miembro nuevo: crea su cuenta y lo deja con la sesión iniciada.
+ * El dorsal y el ID son suyos; la posición la elige él mismo al entrar.
+ */
+app.post(
+  '/api/auth/register',
+  asyncRoute(async (req, res) => {
+    const { username, number, position, displayName, password } = req.body || {};
+
+    const name = String(username || '').trim();
+    if (name.length < 3) {
+      return res.status(400).json({ error: 'El ID debe tener al menos 3 caracteres' });
+    }
+    if (String(password || '').length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+    const dorsal = String(number || '').trim();
+    if (!/^\d{1,2}$/.test(dorsal)) {
+      return res.status(400).json({ error: 'El dorsal debe ser un número de 1 o 2 cifras' });
+    }
+
+    const player = store.createPlayer({
+      username: name,
+      number: dorsal,
+      position,
+      displayName,
+      password,
+    });
+
+    req.session.regenerate((error) => {
+      if (error) return res.status(500).json({ error: 'No se pudo iniciar sesión' });
+      req.session.playerId = player.id;
+      res.status(201).json({ user: player, today: store.todayISO() });
+    });
+  }),
+);
+
 app.post(
   '/api/auth/password',
   requireAuth,
@@ -224,7 +261,17 @@ app.delete(
  * ------------------------------------------------------------------ */
 
 app.get('/api/lineup', (req, res) => {
-  res.json({ lineup: store.raw().lineup, positions: store.POSITIONS });
+  const date = normaliseDate(req.query.date);
+  // La convocatoria solo se envía a quien ha iniciado sesión: la pizarra es
+  // pública, pero quién viene al partido no tiene por qué serlo.
+  const viewer = currentUser(req);
+  res.json({
+    lineup: store.raw().lineup,
+    positions: store.POSITIONS,
+    date,
+    statuses: viewer ? store.statusMap(date) : {},
+    counts: viewer ? store.sessionView(date).counts : null,
+  });
 });
 
 app.put(

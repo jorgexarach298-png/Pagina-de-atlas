@@ -543,6 +543,15 @@ img { display: block; max-width: 100%; }
   color: var(--paper);
   backdrop-filter: blur(6px);
 }
+/* Marca de la carta del propio usuario. */
+.card__pill--me {
+  left: auto;
+  right: 0.85rem;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1206;
+}
+.card--me { box-shadow: 0 0 0 2px rgba(227, 184, 92, 0.5), var(--shadow); }
 
 .card__badge-captain {
   position: absolute;
@@ -633,26 +642,30 @@ img { display: block; max-width: 100%; }
 .board {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  max-width: 640px;
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.028) 0 5%, rgba(0, 0, 0, 0.03) 5% 10%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.028) 0 5%, rgba(0, 0, 0, 0.03) 5% 10%),
     linear-gradient(170deg, #123c25, #0c2a19 60%, #0a2315);
   border: 2px solid rgba(242, 236, 221, 0.28);
   touch-action: none;
 }
+/* Selección pendiente de colocar: el césped invita a pulsar. */
+.board.is-picking { cursor: crosshair; box-shadow: inset 0 0 0 3px rgba(227, 184, 92, 0.35); }
 
-/* Marcas del campo */
+/* Marcas del campo, en vertical: porterías arriba y abajo. */
 .board__mark { position: absolute; pointer-events: none; border-color: rgba(242, 236, 221, 0.32); }
 .board__half {
-  top: 0; bottom: 0; left: 50%;
-  width: 1px;
-  border-left: 2px solid rgba(242, 236, 221, 0.28);
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  border-top: 2px solid rgba(242, 236, 221, 0.28);
 }
 .board__circle {
   top: 50%; left: 50%;
-  width: 26%; aspect-ratio: 1;
+  width: 30%; aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border: 2px solid rgba(242, 236, 221, 0.28);
   border-radius: 50%;
@@ -667,25 +680,34 @@ img { display: block; max-width: 100%; }
   background: rgba(242, 236, 221, 0.4);
 }
 .board__box {
-  top: 50%;
-  width: 15%; height: 52%;
-  transform: translateY(-50%);
+  left: 50%;
+  width: 52%; height: 15%;
+  transform: translateX(-50%);
   border: 2px solid rgba(242, 236, 221, 0.28);
 }
-.board__box--left { left: -2px; border-left: 0; }
-.board__box--right { right: -2px; border-right: 0; }
+.board__box--bottom { bottom: -2px; border-bottom: 0; }
+.board__box--top { top: -2px; border-top: 0; }
 .board__goal {
-  top: 50%;
-  width: 5.5%; height: 22%;
-  transform: translateY(-50%);
+  left: 50%;
+  width: 22%; height: 5.5%;
+  transform: translateX(-50%);
   border: 2px solid rgba(242, 236, 221, 0.22);
 }
-.board__goal--left { left: -2px; border-left: 0; }
-.board__goal--right { right: -2px; border-right: 0; }
+.board__goal--bottom { bottom: -2px; border-bottom: 0; }
+.board__goal--top { top: -2px; border-top: 0; }
+
+/* Leyenda de la convocatoria sobre el campo */
+.board-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.board-legend__item b { font-weight: 800; opacity: 0.85; }
 
 .token {
   position: absolute;
-  width: clamp(52px, 8.4%, 84px);
+  width: clamp(46px, 14%, 74px);
   transform: translate(-50%, -50%);
   cursor: grab;
   touch-action: none;
@@ -697,6 +719,15 @@ img { display: block; max-width: 100%; }
 }
 .token:active { cursor: grabbing; }
 .token:hover, .token.is-dragging { z-index: 5; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.6)); }
+.token.is-selected { z-index: 6; }
+.token.is-selected .token__avatar { box-shadow: 0 0 0 4px rgba(227, 184, 92, 0.55); }
+
+/* El aro de la ficha refleja la convocatoria del día. */
+.token--yes { --tone: var(--ok); }
+.token--no { --tone: var(--danger); }
+.token--late { --tone: var(--amber); }
+.token--maybe { --tone: var(--sky); }
+.token--pending { --tone: var(--muted); }
 
 .token__avatar {
   position: relative;
@@ -705,9 +736,26 @@ img { display: block; max-width: 100%; }
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid var(--accent);
+  border: 3px solid var(--tone, var(--accent));
   background: var(--ink-600);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+}
+/* Fantasma que sigue al dedo mientras se arrastra desde la plantilla. */
+.token-ghost {
+  position: absolute;
+  z-index: 20;
+  width: clamp(46px, 14%, 74px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px dashed var(--accent);
+  background: rgba(227, 184, 92, 0.25);
+  color: var(--paper);
+  font-family: var(--cond);
+  font-weight: 800;
+  pointer-events: none;
 }
 .token__avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
 .token__avatar span {
@@ -771,18 +819,27 @@ img { display: block; max-width: 100%; }
 }
 .bench { display: flex; flex-direction: column; gap: 0.4rem; max-height: 340px; overflow-y: auto; }
 .bench__item {
+  /* Sin esto el navegador interpreta el arrastre como scroll y lo cancela
+     (pointercancel): era el motivo de que las cartas no se pudieran colocar. */
+  touch-action: none;
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.4rem 0.55rem;
+  padding: 0.4rem 0.6rem;
   border: 1px solid var(--line);
+  border-left: 4px solid var(--tone, var(--line-strong));
   border-radius: var(--radius-sm);
-  background: rgba(11, 17, 28, 0.7);
+  background: rgba(11, 17, 28, 0.72);
   cursor: grab;
-  text-align: left;
-  width: 100%;
-  transition: border-color 0.2s, background 0.2s;
 }
+.bench__item:active { cursor: grabbing; }
+.bench__item--yes { --tone: var(--ok); }
+.bench__item--no { --tone: var(--danger); }
+.bench__item--late { --tone: var(--amber); }
+.bench__item--maybe { --tone: var(--sky); }
+.bench__item--pending { --tone: var(--line-strong); }
+.bench__item.is-selected { border-color: var(--accent); background: rgba(227, 184, 92, 0.14); }
+.bench__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bench__item:hover { border-color: var(--accent); background: rgba(227, 184, 92, 0.08); }
 .bench__item.is-placed { opacity: 0.45; }
 .bench__num {
@@ -792,6 +849,22 @@ img { display: block; max-width: 100%; }
   text-align: center;
   color: var(--accent);
 }
+.bench__avatar {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--tone, var(--line-strong));
+  background: rgba(6, 10, 18, 0.8);
+  font-family: var(--cond);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.bench__avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .bench__name { flex: 1; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.03em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bench__pos { font-size: 0.68rem; letter-spacing: 0.1em; color: var(--dim); }
@@ -1154,6 +1227,36 @@ img { display: block; max-width: 100%; }
   flex-direction: column;
   gap: 1rem;
   justify-content: center;
+}
+
+/* Pestañas de acceso: entrar o registrarse. */
+.auth-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.5rem;
+}
+.auth-tab {
+  flex: 1;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(11, 17, 28, 0.6);
+  color: var(--muted);
+  font-family: var(--cond);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.auth-tab:hover { border-color: var(--accent); }
+.auth-tab.is-on {
+  background: rgba(227, 184, 92, 0.14);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .login-hint { font-size: 0.82rem; color: var(--dim); line-height: 1.6; }

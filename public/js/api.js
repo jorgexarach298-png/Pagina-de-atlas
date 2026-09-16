@@ -20,6 +20,7 @@ async function request(method, url, body) {
 export const api = {
   me: () => request('GET', '/api/auth/me'),
   login: (username, password) => request('POST', '/api/auth/login', { username, password }),
+  register: (payload) => request('POST', '/api/auth/register', payload),
   logout: () => request('POST', '/api/auth/logout'),
   changePassword: (currentPassword, newPassword) =>
     request('POST', '/api/auth/password', { currentPassword, newPassword }),
@@ -30,7 +31,8 @@ export const api = {
   updatePlayer: (id, patch) => request('PATCH', `/api/players/${id}`, patch),
   deletePlayer: (id) => request('DELETE', `/api/players/${id}`),
 
-  lineup: () => request('GET', '/api/lineup'),
+  lineup: (date) =>
+    request('GET', `/api/lineup${date ? `?date=${encodeURIComponent(date)}` : ''}`),
   saveLineup: (lineup) => request('PUT', '/api/lineup', lineup),
 
   checkin: (date) => request('GET', `/api/checkin?date=${encodeURIComponent(date)}`),

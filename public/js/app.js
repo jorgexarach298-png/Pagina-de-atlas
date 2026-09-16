@@ -2,6 +2,7 @@
 
 import { api } from './api.js';
 import { $, escapeHtml, html, initials, openModal, pickPhoto, toast, todayISO } from './utils.js';
+import { createAuthForm } from './auth.js';
 
 import { renderHome } from './views/home.js';
 import { renderRoster } from './views/roster.js';
@@ -61,26 +62,18 @@ function paintSession() {
 }
 
 function openLogin(onDone) {
-  const form = html(`
-    <div class="form-grid" style="grid-template-columns:1fr">
-      <div class="field">
-        <label for="lg-user">ID de miembro</label>
-        <input class="input" id="lg-user" autocomplete="username" placeholder="tu ID en la plantilla" />
-      </div>
-      <div class="field">
-        <label for="lg-pass">Contraseña</label>
-        <input class="input" id="lg-pass" type="password" autocomplete="current-password" />
-      </div>
-      <p class="login-hint">
-        Cada miembro entra con el ID que aparece en su carta. La contraseña inicial es
-        <code>atlas</code> + tu dorsal (p. ej. <code>atlas9</code>); cámbiala al entrar.
-      </p>
-    </div>
-  `);
+  const auth = createAuthForm({
+    positions: state.positions,
+    onDone: (user) => {
+      state.user = user;
+      paintSession();
+      onDone?.(user);
+    },
+  });
 
   openModal({
-    title: 'Entrar en ATLAS',
-    body: form,
+    title: 'Acceso a ATLAS',
+    body: auth.el,
     actions: [
       { label: 'Cancelar', variant: 'ghost' },
       {
@@ -88,26 +81,15 @@ function openLogin(onDone) {
         variant: 'primary',
         keepOpen: false,
         onClick: async ({ close }) => {
-          try {
-            const { user } = await api.login(
-              $('#lg-user', form).value.trim(),
-              $('#lg-pass', form).value,
-            );
-            state.user = user;
-            paintSession();
-            toast(`Bienvenido, ${user.displayName}`);
-            close();
-            onDone?.(user);
-          } catch (error) {
-            toast(error.message, 'error');
-            return false;
-          }
+          const user = await auth.submit();
+          if (!user) return false;
+          close();
           return true;
         },
       },
     ],
     onMount: ({ veil }) => {
-      veil.querySelector('form, input')?.addEventListener('keydown', (event) => {
+      veil.querySelector('input')?.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
         veil.querySelector('.btn--primary')?.click();
@@ -306,6 +288,15 @@ async function boot() {
     state.user = null;
   }
   paintSession();
+
+  // Posiciones y datos del club: los necesita el formulario de registro.
+  try {
+    const { positions, club } = await api.roster();
+    state.positions = positions || [];
+    state.club = club || {};
+  } catch {
+    /* el registro usará la lista por defecto */
+  }
 
   window.addEventListener('hashchange', render);
   await render();

@@ -53,6 +53,9 @@ async function paint(ctx) {
   ctx.outlet.querySelectorAll('[data-photo]').forEach((button) => {
     button.addEventListener('click', () => uploadPhoto(button.dataset.photo, ctx));
   });
+  ctx.outlet.querySelectorAll('[data-my-photo]').forEach((button) => {
+    button.addEventListener('click', () => uploadMyPhoto(ctx));
+  });
   ctx.outlet.querySelectorAll('[data-edit]').forEach((button) => {
     button.addEventListener('click', () => editPlayer(button.dataset.edit, players, ctx));
   });
@@ -72,13 +75,15 @@ function renderGroup(group, ctx) {
 
 function renderCard(player, ctx) {
   const isAdmin = Boolean(ctx.state.user?.isAdmin);
+  const isMe = ctx.state.user?.id === player.id;
   const isCaptain = ctx.state.club?.captainId === player.id;
   const position = (ctx.state.positions || []).find((p) => p.key === player.position);
   const label = position ? position.label : player.position;
 
   return `
-    <article class="card ${isCaptain ? 'card--captain' : ''}" data-player="${escapeHtml(player.id)}">
+    <article class="card ${isCaptain ? 'card--captain' : ''} ${isMe ? 'card--me' : ''}" data-player="${escapeHtml(player.id)}">
       ${isCaptain ? '<span class="card__badge-captain" title="Capitán">©</span>' : ''}
+      ${isMe ? '<span class="card__pill card__pill--me">Tú</span>' : ''}
       <span class="card__pill">${escapeHtml(player.position)} · ${escapeHtml(label)}</span>
       <span class="card__number">${escapeHtml(player.number)}</span>
       <div class="card__media">
@@ -102,7 +107,11 @@ function renderCard(player, ctx) {
                <button class="card__upload" data-photo="${escapeHtml(player.id)}" title="Subir foto">📷 Foto</button>
                <button class="card__upload" data-edit="${escapeHtml(player.id)}" title="Editar miembro">✎</button>
              </div>`
-          : ''
+          : isMe
+            ? `<div class="card__admin">
+                 <button class="card__upload" data-my-photo title="Subir mi foto">📷 Mi foto</button>
+               </div>`
+            : ''
       }
     </article>
   `;
@@ -132,6 +141,21 @@ async function uploadPhoto(playerId, ctx) {
     if (!dataUrl) return;
     await api.updatePlayer(playerId, { photo: dataUrl });
     toast('Foto actualizada');
+    await paint(ctx);
+  } catch (error) {
+    toast(error.message, 'error');
+  }
+}
+
+/** Cada miembro sube su propia foto desde su carta de la Plantilla. */
+async function uploadMyPhoto(ctx) {
+  try {
+    const dataUrl = await pickPhoto();
+    if (!dataUrl) return;
+    const { user } = await api.updateMe({ photo: dataUrl });
+    ctx.state.user = user;
+    ctx.onUserChange?.(user);
+    toast('Tu foto está lista');
     await paint(ctx);
   } catch (error) {
     toast(error.message, 'error');

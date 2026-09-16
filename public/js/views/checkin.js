@@ -1,7 +1,8 @@
 'use strict';
 
 import { api } from '../api.js';
-import { $, escapeHtml, initials, toast, formatDayLong, relativeDate, todayISO } from '../utils.js';
+import { $, escapeHtml, initials, toast, formatDayLong, relativeDate, todayISO, hashParam } from '../utils.js';
+import { createAuthForm } from '../auth.js';
 
 const STATUS_META = {
   yes: { label: 'Estará', icon: '✅' },
@@ -23,7 +24,7 @@ const COUNTERS = [
  * Verde = estará, rojo = no puede, ámbar = tarde, azul = duda.
  */
 export async function renderCheckin(ctx) {
-  let date = todayISO();
+  let date = hashParam('date', todayISO());
 
   const load = async () => {
     const isAdmin = Boolean(ctx.state.user?.isAdmin);
@@ -47,6 +48,7 @@ export async function renderCheckin(ctx) {
               <label for="ck-date">Fecha de la sesión</label>
               <input class="input" type="date" id="ck-date" value="${escapeHtml(date)}" />
             </div>
+            <a class="btn btn--ghost" href="#/pizarra?date=${escapeHtml(date)}">Ver en la pizarra</a>
           </div>
         </div>
 
@@ -224,26 +226,15 @@ function loginPrompt() {
             El check-in es para los miembros de la plantilla. Entra con el mismo ID que tienes
             en la web y marca si vienes al partido.
           </p>
-          <form id="ck-login" class="form-grid" style="grid-template-columns:1fr">
-            <div class="field">
-              <label for="ck-user">ID de miembro</label>
-              <input class="input" id="ck-user" autocomplete="username" placeholder="ej. tonii_gk" />
-            </div>
-            <div class="field">
-              <label for="ck-pass">Contraseña</label>
-              <input class="input" id="ck-pass" type="password" autocomplete="current-password" />
-            </div>
-            <button class="btn btn--primary" type="submit">Entrar y firmar</button>
-          </form>
-          <p class="login-hint" id="ck-hint"></p>
+          <div id="ck-auth"></div>
         </div>
         <div class="login-card">
           <h2 class="section__title" style="font-size:1.4rem">¿Cómo funciona?</h2>
           <ul class="login-hint" style="display:flex;flex-direction:column;gap:.6rem;margin:0;padding-left:1.1rem">
             <li>Entra con tu ID de la plantilla (p. ej. <code>tonii_gk</code>).</li>
+            <li>Si aún no tienes cuenta, pestaña <strong>Registrarme</strong> y listo.</li>
             <li>Pulsa <strong>Estaré</strong> y tu fila se pondrá en verde ✅.</li>
-            <li>Si no puedes, marca <strong>No puedo</strong> para avisar al equipo.</li>
-            <li>Puedes cambiar tu respuesta hasta el inicio del partido.</li>
+            <li>Marca <strong>No puedo</strong> para avisar, o <strong>Tarde</strong> si llegas con retraso.</li>
           </ul>
         </div>
       </div>
@@ -252,22 +243,16 @@ function loginPrompt() {
 }
 
 function bindLogin(ctx, reload) {
-  const form = $('#ck-login', ctx.outlet);
-  const hint = $('#ck-hint', ctx.outlet);
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    hint.innerHTML = 'Comprobando…';
-    try {
-      const { user } = await api.login($('#ck-user', form).value.trim(), $('#ck-pass', form).value);
+  const auth = createAuthForm({
+    positions: ctx.state.positions,
+    onDone: async (user) => {
       ctx.state.user = user;
       ctx.onUserChange?.(user);
-      toast(`Bienvenido, ${user.displayName}`);
       ctx.outlet.innerHTML = '<p class="loader">Cargando check-in…</p>';
       await reload();
-    } catch (error) {
-      hint.innerHTML = `<span style="color:var(--danger)">${escapeHtml(error.message)}</span>`;
-    }
+    },
   });
+  $('#ck-auth', ctx.outlet).append(auth.el);
 }
 
 async function sign(ctx, date, status, reload, announce = true) {
