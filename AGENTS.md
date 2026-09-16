@@ -75,8 +75,20 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persisten
   arrastrando desde el banquillo, pulsando «Añadir», o tocando la carta y luego
   el césped. En un móvil vertical el campo y el banquillo no caben a la vez, así
   que el flujo de tocar-y-colocar es el importante ahí.
-- `.bench__item` y `.token` llevan `touch-action: none`: sin eso el navegador
-  interpreta el gesto como scroll y dispara `pointercancel`.
+- `.token` lleva `touch-action: none`: sin eso el navegador interpreta el gesto
+  como scroll y dispara `pointercancel`.
+- En el banquillo la regla es la contraria. Con 16 cartas mide ~905 px dentro de
+  una caja de 340 px, así que tiene que poder desplazarse con el dedo. Por eso
+  `.bench__item` usa `touch-action: pan-y` y **no** se llama a `preventDefault()`
+  en su `pointerdown`: bloquearlo dejaba la lista sin scroll en el móvil.
+  - Con el dedo, arrastrar al campo se hace desde el asa (`.bench__avatar`,
+    `.bench__num`, `.bench__grip`), que sí lleva `touch-action: none`. Tocar el
+    resto de la carta la selecciona, y deslizar sobre ella desplaza la lista.
+  - Con el ratón se arrastra desde cualquier punto de la carta, incluido el
+    botón «Añadir» (`desdeBoton`), y la selección nativa se corta con
+    `preventDefault()`, que en ratón no estorba.
+- El banquillo marca `is-editable` solo al admin: sin eso los demás usuarios ven
+  el cursor de agarre en cartas que no pueden mover.
 - El aro de cada ficha refleja la convocatoria del día (`token--yes`/`no`/`late`/
   `maybe`). Ese dato solo se envía a quien ha iniciado sesión: la pizarra es
   pública, pero quién viene al partido no.
