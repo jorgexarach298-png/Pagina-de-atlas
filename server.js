@@ -15,6 +15,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 const app = express();
 app.disable('x-powered-by');
+// Detrás del túnel HTTPS de desarrollo el proxy termina TLS: sin esto la sesión
+// no se marcaría como segura y la cookie podría no fijarse correctamente.
+app.set('trust proxy', 1);
 
 app.use(express.json({ limit: '10mb' }));
 

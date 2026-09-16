@@ -10,7 +10,12 @@ npm install
 npm start          # http://localhost:3000
 ```
 
-El servidor usa el puerto de la variable `PORT` (por defecto `3000`).
+El servidor usa el puerto de la variable `PORT` (por defecto `3000`) y escucha en
+`0.0.0.0`, así que también es accesible desde el túnel o la red local:
+
+```bash
+PORT=12000 npm start
+```
 
 ## Accesos
 
@@ -56,9 +61,29 @@ public/index.html      Contenedor de la aplicación
 public/css/styles.css  Diseño (noche de estadio + cartas tipo FUT)
 public/js/app.js       Router, sesión y cabecera
 public/js/views/       Vistas: home, roster, pizarra, checkin, history
+public/img/escudo.png  Escudo del club (cabecera, portada y favicon)
 data/atlas.json        Base de datos (se crea sola en el primer arranque)
 data/uploads/          Fotos subidas
 ```
 
 Los datos se guardan en `data/atlas.json`. Para reiniciar la web a su estado inicial
 (plantilla original, sin fotos ni check-ins) basta con borrar ese fichero y reiniciar.
+
+## Identidad visual
+
+La paleta sale del escudo del club (`public/img/escudo.png`) y se define en las
+variables CSS al principio de `public/css/styles.css`:
+
+| Uso | Variable | Color |
+| --- | --- | --- |
+| Fondo (azul marino) | `--ink-900` … `--ink-400` | `#070b13` … `#26344a` |
+| Acento de marca (oro) | `--accent` | `#e3b85c` |
+| Oro claro | `--gold` | `#f0cd7a` |
+| Azul acero | `--sky` | `#4a90c4` |
+| Carmesí | `--danger` | `#e05566` |
+| Ámbar | `--amber` | `#e8a33d` |
+| Texto (marfil) | `--paper` | `#f2ecdd` |
+| Confirmado (verde) | `--ok` | `#4caf72` |
+
+El verde (`--ok`) no forma parte del escudo: se reserva para los estados positivos
+(check-in «Estará», plazas confirmadas) y así el dorado queda como color de club.

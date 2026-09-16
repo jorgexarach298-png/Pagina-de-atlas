@@ -30,6 +30,7 @@ export async function renderHome(ctx) {
 
   ctx.outlet.innerHTML = `
     <section class="hero reveal">
+      <img class="hero__crest" src="/img/escudo.png" alt="Escudo del club ATLAS" />
       <p class="hero__eyebrow">${escapeHtml(club.game || 'EA SPORTS FC 27 · Clubes Pro')}</p>
       <h1 class="hero__title">${escapeHtml(club.name || 'ATLAS')}</h1>
       <p class="hero__tagline">${escapeHtml(club.tagline || 'Un escudo, once corazones.')}</p>

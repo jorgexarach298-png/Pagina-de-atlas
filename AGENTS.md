@@ -32,6 +32,26 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persisten
 - Escapar siempre los datos de usuario con `escapeHtml` antes de insertarlos en HTML.
 - Los ids de jugador se derivan del username (minúsculas, no alfanumérico a guion).
 
+## Identidad visual y paleta
+- El escudo vive en `public/img/escudo.png` y se usa en la cabecera, la portada
+  (`.hero__crest`) y el favicon. La paleta se deriva de él y se define como variables
+  CSS al principio de `public/css/styles.css`:
+  fondo azul marino (`--ink-*`), oro de marca (`--accent` `#e3b85c`), azul acero
+  (`--sky`), carmesí (`--danger`), ámbar (`--amber`) y marfil (`--paper`).
+- El verde `--ok` **no** está en el escudo: se reserva para estados positivos
+  (check-in «Estará», confirmados). No usarlo como color de marca.
+- El verde del campo de la pizarra (`.board`) es intencional (césped), no lo cambies
+  al retematizar.
+
+## Verificación visual
+- Capturar con Chromium headless. Las animaciones `.reveal` quedan congeladas en
+  `--virtual-time-budget`, así que hay que añadir `--force-prefers-reduced-motion`
+  o la página sale casi en negro aunque el DOM sea correcto:
+  `chromium --headless --no-sandbox --disable-gpu --force-prefers-reduced-motion \`
+  `  --window-size=1440,1100 --virtual-time-budget=9000 --screenshot=/tmp/x.png URL`
+- `--dump-dom` sirve para confirmar que el contenido se renderiza aunque el
+  screenshot salga oscuro.
+
 ## Autenticación
 - Admin por defecto: `admin` / `atlas-admin` (configurable con `ATLAS_ADMIN_USER`
   y `ATLAS_ADMIN_PASSWORD`).
