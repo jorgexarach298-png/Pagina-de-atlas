@@ -231,6 +231,7 @@ export async function renderPizarra(ctx) {
     };
 
     const renderBench = () => {
+      bench.classList.toggle('is-editable', isAdmin);
       bench.innerHTML = sortedPlayers
         .map((player) => {
           const placed = slots.has(player.id);
@@ -252,6 +253,11 @@ export async function renderPizarra(ctx) {
                 canSeeStatus ? ` · ${escapeHtml(labelOf(player.id))}` : ''
               }</span>
             </span>
+            ${
+              isAdmin
+                ? `<span class="bench__grip" title="Arrastra desde aquí para subir al campo" aria-hidden="true">⠿</span>`
+                : ''
+            }
             ${
               isAdmin
                 ? placed
@@ -293,7 +299,23 @@ export async function renderPizarra(ctx) {
       bench.querySelectorAll('[data-bench]').forEach((item) => {
         item.addEventListener('pointerdown', (event) => {
           if (event.target.closest('button')) return;
-          startDragFromBench(event, item, item.dataset.bench);
+          // Con el dedo, el asa (avatar y dorsal) arrastra la carta al campo.
+          // El resto de la carta queda para tocar y seleccionar, o para deslizar
+          // la lista, que en el móvil no cabe entera.
+          const soloTap =
+            event.pointerType === 'touch' &&
+            !event.target.closest('.bench__avatar, .bench__num, .bench__grip');
+          startDragFromBench(event, item, item.dataset.bench, { soloTap });
+        });
+      });
+
+      // Con el ratón, el botón «Añadir» también sirve para arrastrar la carta al
+      // campo; si no se mueve el puntero, el clic del botón la coloca igual.
+      bench.querySelectorAll('[data-add]').forEach((button) => {
+        button.addEventListener('pointerdown', (event) => {
+          if (event.pointerType === 'touch') return;
+          const item = button.closest('.bench__item');
+          startDragFromBench(event, item, button.dataset.add, { desdeBoton: true });
         });
       });
     };
@@ -362,26 +384,42 @@ export async function renderPizarra(ctx) {
      * Arrastre desde la plantilla. Si el navegador cancela el gesto (por ejemplo
      * al hacer scroll en el móvil) o el dedo no se mueve, la carta queda
      * seleccionada para colocarla tocando el campo: así nunca se pierde.
+     *
+     * Con el ratón hay que llamar a `preventDefault()` para que el navegador no
+     * seleccione el texto de la interfaz mientras se arrastra. Con el dedo, en
+     * cambio, no se llama: bloquearlo impediría desplazar el banquillo, que en
+     * el móvil es más alto que su caja.
+     *
+     * `soloTap` se usa al tocar la carta fuera del asa: un toque sin movimiento
+     * la selecciona, y un deslizamiento se deja al navegador para que desplace
+     * la lista en vez de arrastrar la carta sin querer.
+     *
+     * `desdeBoton` es para el botón «Añadir»: si el puntero no se mueve, no se
+     * toca la selección y deja que el clic del botón coloque la carta.
      */
-    function startDragFromBench(event, item, playerId) {
-      if (!isAdmin) return;
-      event.preventDefault();
-      item.classList.add('is-dragging');
+    function startDragFromBench(event, item, playerId, { soloTap = false, desdeBoton = false } = {}) {
+      // Arrastrar una carta no debe arrastrar también el texto seleccionado.
+      window.getSelection()?.removeAllRanges();
+      if (event.pointerType !== 'touch') event.preventDefault();
+      if (!desdeBoton) item.classList.add('is-dragging');
 
       const start = { x: event.clientX, y: event.clientY };
       let ghost = null;
       let moved = false;
 
       const move = (moveEvent) => {
+        if (!isAdmin) return;
         if (!moved) {
           if (Math.hypot(moveEvent.clientX - start.x, moveEvent.clientY - start.y) < 6) return;
           moved = true;
+          if (soloTap) return;
           ghost = document.createElement('div');
           ghost.className = 'token-ghost';
           const player = players.find((p) => p.id === playerId);
           ghost.textContent = player ? player.number : '';
           board.append(ghost);
         }
+        if (soloTap) return;
         const slot = pointerToSlot(moveEvent);
         ghost.style.left = `${slot.x * 100}%`;
         ghost.style.top = `${slot.y * 100}%`;
@@ -397,6 +435,15 @@ export async function renderPizarra(ctx) {
 
       const up = (upEvent) => {
         detach();
+        if (!isAdmin) {
+          // Quien solo mira no puede colocar: sus toques no cambian nada.
+          window.getSelection()?.removeAllRanges();
+          return;
+        }
+        // Deslizamiento sobre la carta fuera del asa: era scroll de la lista.
+        if (soloTap && moved) return;
+        // Sin movimiento desde el botón: ya lo coloca su propio clic.
+        if (desdeBoton && !moved) return;
         if (moved && !isOutside(upEvent)) {
           slots.set(playerId, pointerToSlot(upEvent));
           selectedId = null;
@@ -412,6 +459,7 @@ export async function renderPizarra(ctx) {
 
       const cancel = () => {
         detach();
+        if (!isAdmin || soloTap) return;
         selectedId = playerId;
         renderAll();
       };

@@ -639,6 +639,13 @@ img { display: block; max-width: 100%; }
   box-shadow: var(--shadow);
 }
 
+/* Sin esto, arrastrar una carta selecciona el texto de la interfaz en vez de
+   moverla, y en algunos navegadores la carta sale como imagen fantasma. */
+.board-layout {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .board {
   position: relative;
   width: 100%;
@@ -819,9 +826,10 @@ img { display: block; max-width: 100%; }
 }
 .bench { display: flex; flex-direction: column; gap: 0.4rem; max-height: 340px; overflow-y: auto; }
 .bench__item {
-  /* Sin esto el navegador interpreta el arrastre como scroll y lo cancela
-     (pointercancel): era el motivo de que las cartas no se pudieran colocar. */
-  touch-action: none;
+  /* `pan-y` deja que el navegador desplace la lista al deslizar el dedo sobre
+     una carta, que en el móvil no cabe entera. El arrastre al campo se hace
+     desde el asa (avatar + dorsal), que sí lleva `touch-action: none`. */
+  touch-action: pan-y;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -830,9 +838,26 @@ img { display: block; max-width: 100%; }
   border-left: 4px solid var(--tone, var(--line-strong));
   border-radius: var(--radius-sm);
   background: rgba(11, 17, 28, 0.72);
-  cursor: grab;
 }
-.bench__item:active { cursor: grabbing; }
+/* Asa de arrastre: con el dedo, agarrar aquí mueve la carta al campo. */
+.bench__avatar,
+.bench__num,
+.bench__grip { touch-action: none; }
+/* Solo quien puede mover cartas ve el cursor de agarre. */
+.bench.is-editable .bench__item,
+.bench.is-editable .bench__avatar,
+.bench.is-editable .bench__num,
+.bench.is-editable .bench__grip { cursor: grab; }
+.bench.is-editable .bench__item:active { cursor: grabbing; }
+/* Pista visual de dónde agarrar para arrastrar la carta. */
+.bench__grip {
+  color: var(--dim);
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: -2px;
+  padding: 0 0.1rem;
+}
+.bench__item:hover .bench__grip { color: var(--accent); }
 .bench__item--yes { --tone: var(--ok); }
 .bench__item--no { --tone: var(--danger); }
 .bench__item--late { --tone: var(--amber); }
