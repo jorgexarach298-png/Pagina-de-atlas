@@ -93,6 +93,27 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persisten
   `maybe`). Ese dato solo se envía a quien ha iniciado sesión: la pizarra es
   pública, pero quién viene al partido no.
 
+## Arrancar y parar
+
+`./atlas.sh` controla el servidor. En este entorno el puerto **12000** es el que
+da URL pública (`work-1-...`); `npm start` usa el 3000.
+
+```
+./atlas.sh start     # arranca en segundo plano (aguanta que cierres la terminal)
+./atlas.sh status    # dice si esta vivo, y con que resultado responde
+./atlas.sh restart   # reinicia; util si se queda colgado
+./atlas.sh stop      # lo detiene
+./atlas.sh start 3000   # opcional: otro puerto
+```
+
+El proceso se lanza con `setsid nohup`, deja el log en `data/server.log` y el PID
+en `data/server.pid`. `start` no duplica si ya hay uno, y si encuentra un
+`node server.js` suelto (sin pidfile) lo detiene antes de arrancar.
+
+**Ojo:** el servidor no se relanza solo cuando el contenedor se reinicia. Si la
+web deja de responder, ejecuta `./atlas.sh start`. Tanto el código como
+`data/atlas.json` sobreviven a esos reinicios.
+
 ## Estado de datos
 `data/atlas.json`, `data/session.key` y `data/uploads/*` están en `.gitignore`
 (solo se versiona `data/uploads/.gitkeep`). Para volver al estado inicial basta
