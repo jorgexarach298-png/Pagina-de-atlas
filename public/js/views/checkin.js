@@ -28,7 +28,6 @@ export async function renderCheckin(ctx) {
 
   const load = async () => {
     const isAdmin = Boolean(ctx.state.user?.isAdmin);
-    const canSign = ctx.state.user && !ctx.state.user.isAdmin;
 
     if (!ctx.state.user) {
       ctx.outlet.innerHTML = loginPrompt();
@@ -67,13 +66,7 @@ export async function renderCheckin(ctx) {
           ).join('')}
         </div>
 
-        ${
-          canSign
-            ? renderMyPanel(data, ctx.state.user)
-            : isAdmin
-              ? '<p class="section__hint" style="margin-bottom:1rem">Como administrador puedes corregir el estado de cualquiera: usa el botón del final de cada fila.</p>'
-              : ''
-        }
+        ${renderMyPanel(data, ctx.state.user)}
 
         <div class="roster-list">
           ${data.roster.map((row) => renderRow(row, ctx)).join('')}
@@ -115,15 +108,13 @@ export async function renderCheckin(ctx) {
       });
     });
 
-    if (canSign) {
-      ctx.outlet.querySelectorAll('[data-status]').forEach((button) => {
-        button.addEventListener('click', () => sign(ctx, date, button.dataset.status, load));
-      });
-      $('#ck-message', ctx.outlet)?.addEventListener('blur', () => {
-        const current = data.roster.find((row) => row.player.id === ctx.state.user.id);
-        if (current?.status) sign(ctx, date, current.status, load, false);
-      });
-    }
+    ctx.outlet.querySelectorAll('[data-status]').forEach((button) => {
+      button.addEventListener('click', () => sign(ctx, date, button.dataset.status, load));
+    });
+    $('#ck-message', ctx.outlet)?.addEventListener('blur', () => {
+      const current = data.roster.find((row) => row.player.id === ctx.state.user.id);
+      if (current?.status) sign(ctx, date, current.status, load, false);
+    });
 
     if (isAdmin) {
       ctx.outlet.querySelectorAll('[data-admin-status]').forEach((button) => {
@@ -192,7 +183,7 @@ function renderRow(row, ctx) {
         ${meta ? `${meta.icon} ${meta.label}` : 'Sin responder'}
       </span>
       ${
-        isAdmin
+        isAdmin && !isMe
           ? `<div class="roster-row__admin">
                <button class="btn btn--sm btn--ghost" data-admin-status="yes" data-player="${escapeHtml(
                  player.id,
@@ -232,7 +223,6 @@ function loginPrompt() {
           <h2 class="section__title" style="font-size:1.4rem">¿Cómo funciona?</h2>
           <ul class="login-hint" style="display:flex;flex-direction:column;gap:.6rem;margin:0;padding-left:1.1rem">
             <li>Entra con tu ID de la plantilla (p. ej. <code>tonii_gk</code>).</li>
-            <li>Si aún no tienes cuenta, pestaña <strong>Registrarme</strong> y listo.</li>
             <li>Pulsa <strong>Estaré</strong> y tu fila se pondrá en verde ✅.</li>
             <li>Marca <strong>No puedo</strong> para avisar, o <strong>Tarde</strong> si llegas con retraso.</li>
           </ul>
@@ -244,7 +234,6 @@ function loginPrompt() {
 
 function bindLogin(ctx, reload) {
   const auth = createAuthForm({
-    positions: ctx.state.positions,
     onDone: async (user) => {
       ctx.state.user = user;
       ctx.onUserChange?.(user);

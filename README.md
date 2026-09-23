@@ -21,14 +21,17 @@ PORT=12000 npm start
 
 | Cuenta | ID | Contraseña inicial |
 | --- | --- | --- |
-| Administrador | `admin` | `atlas-admin` |
 | Cada miembro | su ID de la lista | `atlas` + su dorsal (p. ej. `atlas9`) |
 
-Cada miembro cambia su contraseña desde **Mi cuenta** (arriba a la derecha) al entrar.
-El administrador también puede asignar contraseñas desde la vista Plantilla.
+No hay registro público: la plantilla se crea al primer arranque y cada miembro entra
+con el ID que ya figura en ella. Cada uno cambia su contraseña desde **Mi cuenta**
+(arriba a la derecha). El administrador también puede reiniciar contraseñas desde la vista Plantilla.
 
-Variables de entorno opcionales: `PORT`, `SESSION_SECRET`, `ATLAS_ADMIN_USER`,
-`ATLAS_ADMIN_PASSWORD`, `ATLAS_TZ` (por defecto `Europe/Madrid`).
+Los administradores (`antoniogarciagal`, `RodriKTV`, `habixuelo75` y `Angelotss`) son
+jugadores normales con permisos extra: mueven la pizarra, publican alineaciones, editan
+la plantilla, corrigen el check-in y gestionan la historia.
+
+Variable de entorno opcional: `ATLAS_TZ` (por defecto `Europe/Madrid`).
 
 ## Qué incluye
 
@@ -46,7 +49,7 @@ resto de la plantilla la ve en modo lectura. Incluye las ayudas **Colocar 4-3-3*
 **Check-in** — cada miembro entra con su ID y marca si estará en el partido. La fila se pone
 en verde si vendrá, rojo si no puede, ámbar si llega tarde y azul si duda. Hay contadores,
 mensaje opcional y un seleccionador de fecha con registro de sesiones anteriores.
-El administrador puede corregir el estado de cualquiera.
+Los administradores pueden corregir el estado de cualquier otro compañero.
 
 **Historia** — línea temporal de entradas con fecha, relato e imagen, que el administrador
 publica, edita, destaca o elimina.

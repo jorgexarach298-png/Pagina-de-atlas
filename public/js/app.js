@@ -54,7 +54,7 @@ function paintSession() {
       }
       <span class="session__meta">
         <b>${escapeHtml(user.displayName)}</b>
-        <span>${user.isAdmin ? 'Administrador' : escapeHtml(user.position)}</span>
+        <span>${escapeHtml(user.position)}${user.isAdmin ? ' · Admin' : ''}</span>
       </span>
     </button>
   `;
@@ -63,7 +63,6 @@ function paintSession() {
 
 function openLogin(onDone) {
   const auth = createAuthForm({
-    positions: state.positions,
     onDone: (user) => {
       state.user = user;
       paintSession();
@@ -269,7 +268,11 @@ function paintFooter() {
   const tagline = state.club?.tagline;
   if (tagline) $('#footer-tagline').textContent = tagline;
   $('#footer-updated').textContent = `Hoy es ${todayISO()}`;
-  const admins = state.user?.isAdmin ? 'Sesión de administrador' : state.user ? `Sesión: ${state.user.username}` : 'Visita pública';
+  const admins = state.user?.isAdmin
+    ? `Admin · ${state.user.username}`
+    : state.user
+      ? `Sesión: ${state.user.username}`
+      : 'Visita pública';
   $('#footer-admin').textContent = admins;
 }
 
@@ -289,7 +292,7 @@ async function boot() {
   }
   paintSession();
 
-  // Posiciones y datos del club: los necesita el formulario de registro.
+  // Posiciones y datos del club para las vistas.
   try {
     const { positions, club } = await api.roster();
     state.positions = positions || [];
