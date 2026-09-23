@@ -55,16 +55,25 @@ guarda la ruta, no la imagen; mover los ficheros a un almacenamiento en la nube
 
 ### Si el contenedor se reinicia (solo en este entorno de desarrollo)
 
-El contenedor se recrea de vez en cuando y se lleva por delante PostgreSQL. Un script
-reconstruye todo: reinstala el servidor, crea el usuario y las bases de datos, reimporta
-`data/atlas.json` si hace falta y arranca la web.
+El contenedor se recrea de vez en cuando y **se lleva por delante PostgreSQL**, porque
+sus datos viven en `/var/lib`, que es efímero. Para que eso no vuelva a pasar, la base
+de datos del club vive en **`/workspace/pgdata`**, que es un volumen persistente: los
+datos sobreviven a los reinicios igual que el código.
+
+Un único comando deja todo en marcha (instala lo que falte, crea el cluster si no
+existe, levanta el usuario y las bases y arranca la web):
 
 ```bash
-./scripts/setup-postgres.sh
+./atlas.sh start              # ya arranca la base de datos solo si esta parada
+./scripts/setup-postgres.sh   # o explicitamente, si prefieres ver los pasos
 ```
 
-Es idempotente, así que se puede repetir sin miedo. **Con Supabase configurado no hace
-falta**: los datos viven fuera del contenedor y basta con `./atlas.sh start`.
+Es idempotente y **nunca pisa los datos**: solo importa `data/atlas.json` si la base
+de datos no tiene todavía tablas.
+
+Con **Supabase** configurado esto sobra: los datos viven fuera del contenedor y basta
+con `./atlas.sh start`. De hecho es lo recomendado para producción, porque en la nube
+el volumen local puede no existir.
 
 ## Accesos
 

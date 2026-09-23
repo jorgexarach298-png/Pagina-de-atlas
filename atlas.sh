@@ -50,11 +50,19 @@ arrancar() {
   mkdir -p "$RAIZ/data"
   cd "$RAIZ" || exit 1
 
-  # La web no arranca sin PostgreSQL: se avisa antes de intentarlo.
+  # La web no arranca sin PostgreSQL. Si no hay DATABASE_URL ni .env se avisa;
+  # y si el cluster es el local persistente (/workspace/pgdata) pero esta parado
+  # (tipico tras recrear el contenedor), se levanta solo.
   if [ -z "${DATABASE_URL:-}" ] && [ -z "${ATLAS_DATABASE_URL:-}" ] && [ ! -f "$RAIZ/.env" ]; then
     echo "Aviso: no hay DATABASE_URL ni fichero .env."
     echo "  Copia .env.example a .env y pon ahi la cadena de conexion."
-    echo "  Para probar en local: DATABASE_URL=postgresql://atlas:...@127.0.0.1:5432/atlas"
+    echo "  O levanta el cluster local: ./scripts/setup-postgres.sh"
+  elif ! curl -s -o /dev/null --max-time 2 "http://localhost:5432" 2>/dev/null && \
+       [ -x /usr/lib/postgresql/17/bin/pg_ctl ] && sudo test -d /workspace/pgdata/data; then
+    if ! sudo -u postgres /usr/lib/postgresql/17/bin/pg_isready -h 127.0.0.1 -q 2>/dev/null; then
+      echo "La base de datos local esta parada; la arranco."
+      "$RAIZ/scripts/setup-postgres.sh" "$PUERTO" >/dev/null 2>&1 || true
+    fi
   fi
 
   # setsid + nohup: el servidor sigue vivo aunque se cierre esta terminal.

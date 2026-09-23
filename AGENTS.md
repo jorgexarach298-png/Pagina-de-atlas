@@ -189,19 +189,35 @@ de datos en la nube puede tardar más que en local.
 ### Recuperarse de un reinicio del contenedor
 
 En este entorno el contenedor se recrea de vez en cuando y **se lleva por delante
-PostgreSQL**: desaparece el binario, el clúster y las bases de datos. Los ficheros
-del proyecto sí sobreviven, así que se puede reconstruir todo sin perder nada:
+PostgreSQL**: desaparece el binario y el clúster. La clave está en dónde se guardan los
+datos:
+
+- `/workspace` es un **volumen ext4 persistente** (`/dev/nvme0n2`): sobrevive.
+- `/` es un overlay **efímero**: se resetea, y con él `/var/lib/postgresql`.
+
+Por eso el clúster del club **no** vive en `/var/lib/postgresql`, sino en
+**`/workspace/pgdata/data`**, creado con `initdb` directamente ahí. El usuario
+`postgres` recibe `chown` de ese directorio para poder escribir.
 
 ```
-./scripts/setup-postgres.sh          # reinstala, crea usuario y bases, reimporta y arranca
-./scripts/setup-postgres.sh 3000     # opcional: otro puerto
+./atlas.sh start                 # arranca la BD sola si esta parada
+./scripts/setup-postgres.sh      # o los pasos en detalle
+./scripts/setup-postgres.sh 3000 # opcional: otro puerto
 ```
 
-El script es idempotente. Solo reimporta `data/atlas.json` si la base de datos no
-tiene tablas, así que repetirlo no duplica ni pisa datos. Si ya no queda el JSON
-(por ejemplo, porque el club ya trabaja solo contra la base de datos), hay que
-restaurar desde una copia o desde el respaldo del proveedor: por eso conviene
-tener el `.env` apuntando a Supabase en cuanto se despliegue de verdad.
+El script es idempotente y **nunca pisa los datos**: solo importa `data/atlas.json` si
+la base de datos no tiene tablas. Dos detalles que costaron un fallo cada uno:
+
+- `/workspace/pgdata` es `700` y de `postgres`, así que el usuario normal **no puede
+  leerlo**: hay que comprobar con `sudo test -d`, no `test -d`. Sin eso el script cree
+  que no existe el clúster e intenta recrearlo encima de los datos.
+- Al reinstalar PostgreSQL, el usuario `postgres` puede recibir **otro UID** y los
+  ficheros siguen siendo del antiguo: el script compara UIDs y hace `chown -R` si no
+  coinciden.
+
+Si ya no queda `data/atlas.json` (porque el club trabaja solo contra la base de datos),
+solo se puede restaurar desde una copia. Por eso, para producción, lo suyo es apuntar
+el `.env` a Supabase y no depender del volumen del contenedor.
 
 ## Estado de datos
 Los datos del club viven en PostgreSQL. Solo quedan ficheros locales en `data/`:
