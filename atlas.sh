@@ -60,7 +60,12 @@ arrancar() {
     if curl -s -o /dev/null --max-time 2 "http://localhost:$PUERTO/"; then
       echo "Arrancado en el puerto $PUERTO (PID $pid)."
       echo "  Local:   http://localhost:$PUERTO"
-      echo "  Publica: https://work-1-ywwbnyiskrzjshsp.prod-runtime.all-hands.dev/"
+      # El id del runtime cambia con cada contenedor, asi que la URL publica se
+      # deriva del entorno en vez de quedar fija (una fija acababa dando 404).
+      local rid="${RUNTIME_ID:-}"
+      if [ -n "$rid" ]; then
+        echo "  Publica: https://work-1-$rid.prod-runtime.all-hands.dev/"
+      fi
       echo "  Log:     $LOG"
       return 0
     fi
