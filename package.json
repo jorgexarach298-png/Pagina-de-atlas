@@ -7,13 +7,21 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "migrate": "node scripts/migrate-json-to-db.js",
+    "test": "node tests/run.js",
+    "test:api": "node tests/run.js api.test.js",
+    "test:ui": "node tests/run.js ui.test.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "express": "^5.1.0",
-    "express-session": "^1.18.1"
+    "express-session": "^1.18.1",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.11.0"
   }
 }

@@ -79,6 +79,10 @@ function renderCard(player, ctx) {
   const isCaptain = ctx.state.club?.captainId === player.id;
   const position = (ctx.state.positions || []).find((p) => p.key === player.position);
   const label = position ? position.label : player.position;
+  const stats = player.stats || { played: 0, goals: 0, assists: 0, votes: 0, average: null };
+  const ratingTitle = stats.votes
+    ? `Nota media ${stats.average.toFixed(2)} con ${stats.votes} ${stats.votes === 1 ? 'voto' : 'votos'}`
+    : 'Todavía sin notas de los compañeros';
 
   return `
     <article class="card ${isCaptain ? 'card--captain' : ''} ${isMe ? 'card--me' : ''}" data-player="${escapeHtml(player.id)}">
@@ -99,8 +103,24 @@ function renderCard(player, ctx) {
       </div>
       <div class="card__foot">
         <h3 class="card__name" title="${escapeHtml(player.displayName)}">${escapeHtml(player.displayName)}</h3>
-        <p class="card__sub"><span>ID: ${escapeHtml(player.username)}</span></p>
+        <p class="card__sub">
+          <span>ID: ${escapeHtml(player.username)}</span>
+          ${player.claimed === false ? '<span class="card__flag">Sin cuenta</span>' : ''}
+        </p>
+        <dl class="card__stats">
+          <div><dt>PJ</dt><dd>${stats.played}</dd></div>
+          <div><dt>Goles</dt><dd>${stats.goals}</dd></div>
+          <div><dt>Asist.</dt><dd>${stats.assists}</dd></div>
+          ${
+            stats.cleanSheetsEligible
+              ? `<div title="Partidos con la portería a cero"><dt>Imbatidas</dt><dd>${stats.cleanSheets || 0}</dd></div>`
+              : ''
+          }
+        </dl>
       </div>
+      <span class="card__rating${stats.votes ? '' : ' card__rating--empty'}" title="${escapeHtml(
+        ratingTitle,
+      )}">${stats.votes ? stats.average.toFixed(1) : '—'}</span>
       ${
         isAdmin
           ? `<div class="card__admin">
@@ -220,6 +240,26 @@ function editPlayer(playerId, players, ctx) {
             await paint(ctx);
           } catch (error) {
             toast(error.message, 'error');
+          }
+          return false;
+        },
+      },
+      {
+        label: 'Restablecer cuenta',
+        variant: 'ghost',
+        onClick: async ({ close }) => {
+          const ok = await confirmAction(
+            `¿Devolver el acceso a ${player.displayName}? Su ID volverá a aparecer en «Registrarme» para que elija una contraseña nueva.`,
+          );
+          if (!ok) return false;
+          try {
+            await api.resetAccount(player.id);
+            toast('Cuenta restablecida: ya puede registrarse de nuevo');
+            close();
+            await paint(ctx);
+          } catch (error) {
+            toast(error.message, 'error');
+            return false;
           }
           return false;
         },

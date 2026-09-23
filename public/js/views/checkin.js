@@ -28,7 +28,9 @@ export async function renderCheckin(ctx) {
 
   const load = async () => {
     const isAdmin = Boolean(ctx.state.user?.isAdmin);
-    const canSign = ctx.state.user && !ctx.state.user.isAdmin;
+    // Quien también juega firma su check-in aunque tenga permisos de mánager; la
+    // cuenta técnica de administración no juega y por eso no firma.
+    const canSign = Boolean(ctx.state.user?.isPlayer);
 
     if (!ctx.state.user) {
       ctx.outlet.innerHTML = loginPrompt();
@@ -72,7 +74,7 @@ export async function renderCheckin(ctx) {
             ? renderMyPanel(data, ctx.state.user)
             : isAdmin
               ? '<p class="section__hint" style="margin-bottom:1rem">Como administrador puedes corregir el estado de cualquiera: usa el botón del final de cada fila.</p>'
-              : ''
+              : '<p class="section__hint" style="margin-bottom:1rem">Tu cuenta no juega, así que no firmas check-in. Puedes ver el estado del equipo.</p>'
         }
 
         <div class="roster-list">
@@ -245,6 +247,8 @@ function loginPrompt() {
 function bindLogin(ctx, reload) {
   const auth = createAuthForm({
     positions: ctx.state.positions,
+    // Aquí no hay modal que ponga el pie: el botón tiene que venir del formulario.
+    withButton: true,
     onDone: async (user) => {
       ctx.state.user = user;
       ctx.onUserChange?.(user);

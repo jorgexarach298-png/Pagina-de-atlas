@@ -489,7 +489,7 @@ img { display: block; max-width: 100%; }
 
 .card__media {
   position: absolute;
-  inset: 0 0 34% 0;
+  inset: 0 0 44% 0;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -593,6 +593,72 @@ img { display: block; max-width: 100%; }
   color: var(--muted);
 }
 
+/* Estadísticas: partidos jugados, goles y asistencias y, en porteros y
+   centrales, las porterías imbatidas. La rejilla se adapta al número de
+   columnas para que todas las cartas mantengan el mismo ancho. */
+.card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+.card__stats:has(> div:nth-child(4)) {
+  grid-template-columns: repeat(4, 1fr);
+  /* Con cuatro columnas el hueco de 0.35rem no cabe en el ancho de la carta
+     y la rejilla se sale 3px; con 0.2rem entra justo. */
+  gap: 0.2rem;
+}
+/* Cuatro columnas dejan poco ancho: la etiqueta se aprieta para que
+   «Imbatidas» quepa sin desbordar ni partirse. */
+.card__stats:has(> div:nth-child(4)) dt {
+  font-size: 0.53rem;
+  letter-spacing: 0.01em;
+}
+.card__stats > div { text-align: center; }
+.card__stats dt {
+  font-family: var(--cond);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.card__stats dd {
+  font-family: var(--cond);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--paper);
+}
+
+/* Nota media de los compañeros, en el borde superior derecho de la carta. */
+.card__rating {
+  position: absolute;
+  z-index: 3;
+  top: 4.1rem;
+  right: 0.7rem;
+  display: grid;
+  place-items: center;
+  min-width: 2.5rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--cond);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #1a1206;
+  background: linear-gradient(160deg, var(--gold), var(--accent));
+  box-shadow: 0 8px 22px -8px var(--accent-glow);
+}
+.card__rating--empty {
+  color: var(--dim);
+  background: rgba(7, 11, 19, 0.75);
+  border: 1px dashed var(--line-strong);
+  box-shadow: none;
+}
+
 .card__admin {
   position: absolute;
   z-index: 4;
@@ -626,7 +692,7 @@ img { display: block; max-width: 100%; }
 .board-layout {
   display: grid;
   gap: 1.2rem;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
   align-items: start;
 }
 @media (max-width: 1020px) { .board-layout { grid-template-columns: 1fr; } }
@@ -810,6 +876,173 @@ img { display: block; max-width: 100%; }
 
 .board-tools { display: flex; flex-direction: column; gap: 1rem; }
 
+/* ---------------------------------------------------------------- Notas del día */
+
+/* Cada jugador puntúa a sus compañeros con notas del 1 al 11, sin repetir
+   ninguna. La lista vive en el lateral, junto al banquillo. */
+.rating-panel { display: flex; flex-direction: column; gap: 0.7rem; }
+.rating-panel__state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.rating-panel__state--open {
+  background: rgba(227, 184, 92, 0.12);
+  border: 1px solid rgba(227, 184, 92, 0.4);
+  color: var(--accent);
+}
+.rating-panel__state--locked {
+  background: rgba(11, 17, 28, 0.6);
+  border: 1px dashed var(--line-strong);
+  color: var(--muted);
+}
+
+.rating-list { display: flex; flex-direction: column; gap: 0.45rem; }
+.rating-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(11, 17, 28, 0.72);
+}
+.rating-row--mine { opacity: 0.55; }
+.rating-row__who { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.rating-row__num {
+  font-family: var(--cond);
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--accent);
+  min-width: 1.6rem;
+}
+.rating-row__name {
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rating-row__avg {
+  font-family: var(--cond);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Selector de nota 1-11: casillas grandes, cómodas también con el dedo. */
+.note-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-width: 15.5rem;
+}
+.note-btn {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(7, 11, 19, 0.7);
+  font-family: var(--cond);
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.note-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--paper); }
+.note-btn.is-on {
+  background: linear-gradient(160deg, var(--gold), var(--accent));
+  border-color: var(--accent);
+  color: #1a1206;
+  transform: translateY(-1px);
+}
+/* Nota que ya se ha puesto a otro compañero: no se puede repetir. */
+.note-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.note-btn:disabled.is-on { opacity: 1; text-decoration: none; }
+
+/* Lista de goles y asistencias que rellena el mánager tras el partido. */
+.stat-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: rgba(11, 17, 28, 0.72);
+}
+.stat-row__fields { display: flex; align-items: center; gap: 0.4rem; }
+.stat-row__fields label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: var(--cond);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+}
+.input--tiny {
+  width: 3.2rem;
+  padding: 0.25rem 0.35rem;
+  text-align: center;
+  font-family: var(--cond);
+  font-weight: 800;
+}
+
+/* Marca para saber de un vistazo quién no ha activado todavía su cuenta. */
+.card__flag {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid rgba(255, 176, 32, 0.5);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.rating-panel__foot,
+.board-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.clean-sheet-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.clean-sheet-toggle input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .panel {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -824,7 +1057,17 @@ img { display: block; max-width: 100%; }
   color: var(--accent);
   margin-bottom: 0.75rem;
 }
-.bench { display: flex; flex-direction: column; gap: 0.4rem; max-height: 340px; overflow-y: auto; }
+/* El banquillo es la herramienta principal del mánager: cuanto más alto, menos
+   hay que desplazarlo para llegar a los 16. En pantallas bajas se limita a la
+   altura de la ventana para no empujar la página. */
+.bench {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: min(74vh, 620px);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
 .bench__item {
   /* `pan-y` deja que el navegador desplace la lista al deslizar el dedo sobre
      una carta, que en el móvil no cabe entera. El arrastre al campo se hace
@@ -1137,6 +1380,13 @@ img { display: block; max-width: 100%; }
   background: rgba(16, 24, 38, 0.5);
 }
 .empty-state b { display: block; font-family: var(--display); font-size: 1.2rem; color: var(--paper); margin-bottom: 0.4rem; }
+.empty-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-top: 1.1rem;
+}
 
 /* ---------------------------------------------------------------- Modal */
 
@@ -1291,6 +1541,9 @@ img { display: block; max-width: 100%; }
   color: var(--accent);
   letter-spacing: 0.06em;
 }
+
+/* Botón propio del formulario cuando no va dentro de un modal (check-in). */
+.auth__submit { margin-top: 1rem; width: 100%; }
 
 .loader { padding: 3rem; text-align: center; color: var(--muted); }
 

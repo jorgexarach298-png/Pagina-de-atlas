@@ -69,14 +69,16 @@ export async function renderPizarra(ctx) {
   let date = hashParam('date', todayISO());
 
   const load = async () => {
-    const [data, roster] = await Promise.all([api.lineup(date), api.roster()]);
-    const players = roster.players;
-    const positions = roster.positions || [];
+    const [data] = await Promise.all([api.lineup(date), api.roster()]);
+    const players = data.roster || [];
+    const positions = data.positions || [];
     ctx.state.positions = positions;
 
     const isAdmin = Boolean(ctx.state.user?.isAdmin);
     const statuses = data.statuses || {};
     const canSeeStatus = ctx.state.user != null;
+    // El mánager abre la jornada publicando el once; hasta entonces no hay notas.
+    const match = data.match || { published: false };
 
     if (!players.length) {
       ctx.outlet.innerHTML =
@@ -85,9 +87,15 @@ export async function renderPizarra(ctx) {
     }
 
     const slots = new Map();
-    for (const item of data.lineup.items || []) {
+    // Quien no es mánager ve el once publicado; el mánager trabaja sobre su
+    // borrador, que puede tener cambios todavía sin publicar.
+    const sourceItems = !isAdmin && match.published ? match.items : data.lineup.items;
+    for (const item of sourceItems || []) {
       if (players.some((p) => p.id === item.playerId)) slots.set(item.playerId, migrateSlot(item));
     }
+
+    // Notas que este jugador ya puso ese día (voto propio, no se enseña al resto).
+    const myScores = { ...(match.myScores || {}) };
 
     const toneOf = (playerId) => STATUS_LABEL[statuses[playerId]]?.tone || 'pending';
     const labelOf = (playerId) => STATUS_LABEL[statuses[playerId]]?.label || 'Sin responder';
@@ -127,9 +135,12 @@ export async function renderPizarra(ctx) {
             ${
               isAdmin
                 ? `<div class="board-actions" style="margin-top:.9rem">
-                     <button class="btn btn--primary" id="save-board">Guardar alineación</button>
+                     <button class="btn btn--primary" id="save-board">Guardar borrador</button>
                      <button class="btn btn--ghost" id="auto-board">Colocar 4-3-3</button>
                      <button class="btn btn--ghost" id="clear-board">Vaciar campo</button>
+                   </div>
+                   <div class="board-actions" style="margin-top:.6rem">
+                     <button class="btn btn--primary" id="publish-board"></button>
                    </div>`
                 : ''
             }
@@ -146,12 +157,18 @@ export async function renderPizarra(ctx) {
               }
               <div class="bench" id="bench"></div>
             </div>
+
+            <div class="panel" id="rating-panel">
+              <h3 class="panel__title">Notas del día</h3>
+              <div class="rating-panel" id="rating-host"></div>
+            </div>
+
             <div class="panel">
               <h3 class="panel__title">Cómo funciona</h3>
               <p class="login-hint">
                 ${
                   isAdmin
-                    ? 'Pulsa <strong>Añadir</strong> para subir a alguien al campo. También puedes arrastrar la carta o seleccionarla y tocar el césped.'
+                    ? 'Coloca el once y pulsa <strong>Publicar once del día</strong>. A partir de ahí, cada jugador que haya entrado podrá puntuar a sus compañeros.'
                     : 'Cada ficha lleva el nombre y el dorsal, así que la táctica se entiende de un vistazo.'
                 }
               </p>
@@ -358,7 +375,207 @@ export async function renderPizarra(ctx) {
       renderTokens();
       renderBench();
       renderLegend();
+      renderRatings();
     };
+
+    /* ------------------------------------------------------- Notas del día */
+
+    /**
+     * Panel de notas. Solo aparece cuando el mánager ha publicado el once del
+     * día: entonces quien haya jugado puntúa a sus compañeros del 1 al 11, sin
+     * repetir ninguna nota en la misma papeleta.
+     */
+    const renderRatings = () => {
+      const host = $('#rating-host', ctx.outlet);
+      const panel = $('#rating-panel', ctx.outlet);
+      if (!host || !panel) return;
+
+      if (!match.published) {
+        panel.hidden = !isAdmin;
+        host.innerHTML = `<p class="rating-panel__state rating-panel__state--locked">
+            Todavía no has publicado el once de este día. Al publicarlo se habilitan las notas.
+          </p>`;
+        return;
+      }
+
+      panel.hidden = false;
+      const playingIds = match.playerIds || [];
+
+      if (isAdmin) {
+        renderMatchStats(host, playingIds);
+        return;
+      }
+
+      if (!ctx.state.user) {
+        host.innerHTML = `<p class="rating-panel__state rating-panel__state--locked">
+            Entra con tu cuenta para puntuar. Solo puntúan los jugadores que entraron en el once.
+          </p>`;
+        return;
+      }
+
+      if (!match.canVote) {
+        host.innerHTML = `<p class="rating-panel__state rating-panel__state--locked">
+            ${
+              isAdmin
+                ? 'Vista de mánager: aquí ves quién ha votado ya, pero las notas las ponen los jugadores.'
+                : 'Este día no entraste en el once, así que no puntúas. Puedes ver la alineación.'
+            }
+            <br />Papeletas recibidas: <strong>${match.ballots || 0}</strong>
+          </p>`;
+        return;
+      }
+
+      const rivals = playingIds
+        .filter((id) => id !== ctx.state.user.id)
+        .map((id) => players.find((p) => p.id === id))
+        .filter(Boolean);
+
+      const usedNotes = new Map();
+      for (const [targetId, value] of Object.entries(myScores)) usedNotes.set(Number(value), targetId);
+
+      host.innerHTML = `
+        <p class="rating-panel__state rating-panel__state--open">
+          Puntúa del <strong>1</strong> al <strong>11</strong>. No puedes repetir una nota ni puntuarte a ti mismo.
+        </p>
+        <div class="rating-list">
+          ${rivals.map((player) => renderRatingRow(player, usedNotes)).join('')}
+        </div>
+        <div class="rating-panel__foot">
+          <button class="btn btn--primary btn--sm" id="save-ratings">Guardar notas</button>
+          <span class="login-hint" id="rating-progress">${Object.keys(myScores).length}/${rivals.length} puestos</span>
+        </div>
+      `;
+
+      host.querySelectorAll('[data-note]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const targetId = button.dataset.target;
+          const note = Number(button.dataset.note);
+          // La nota ya asignada a otro: primero hay que quitarla de allí.
+          const owner = [...usedNotes.entries()].find(([, id]) => id === targetId);
+          if (owner && owner[0] !== note) usedNotes.delete(owner[0]);
+          if (myScores[targetId] === note) {
+            delete myScores[targetId];
+          } else {
+            myScores[targetId] = note;
+            usedNotes.set(note, targetId);
+          }
+          renderRatings();
+        });
+      });
+
+      $('#save-ratings', host).addEventListener('click', async () => {
+        try {
+          const { match: updated } = await api.saveRatings(date, myScores);
+          Object.assign(match, updated);
+          toast('Notas guardadas');
+          renderRatings();
+        } catch (error) {
+          toast(error.message, 'error');
+        }
+      });
+    };
+
+    /**
+     * Vista de mánager: goles y asistencias de cada jugador del once. Son los
+     * datos que alimentan las estadísticas de las cartas de la Plantilla.
+     */
+    function renderMatchStats(host, playingIds) {
+      const rows = playingIds
+        .map((id) => players.find((p) => p.id === id))
+        .filter(Boolean);
+
+      host.innerHTML = `
+        <p class="rating-panel__state rating-panel__state--open">
+          Anota goles y asistencias del partido. Las notas las ponen los jugadores desde su cuenta.
+          <br />Papeletas recibidas: <strong>${match.ballots || 0}</strong>/${rows.length}
+        </p>
+        <div class="rating-list">
+          ${rows
+            .map((player) => {
+              const line = (match.stats || {})[player.id] || { goals: 0, assists: 0 };
+              const avg = (match.averages || {})[player.id]?.average;
+              return `
+              <div class="stat-row" data-stat-row="${escapeHtml(player.id)}">
+                <span class="rating-row__who">
+                  <span class="rating-row__num">${escapeHtml(player.number)}</span>
+                  <span class="rating-row__name">${escapeHtml(player.displayName)}</span>
+                </span>
+                <span class="stat-row__fields">
+                  <label>G <input class="input input--tiny" type="number" min="0" max="99"
+                     data-goals value="${line.goals || 0}" /></label>
+                  <label>A <input class="input input--tiny" type="number" min="0" max="99"
+                     data-assists value="${line.assists || 0}" /></label>
+                  <span class="rating-row__avg">${
+                    avg !== undefined ? Number(avg).toFixed(1) : '—'
+                  }</span>
+                </span>
+              </div>
+            `;
+            })
+            .join('')}
+        </div>
+        <div class="rating-panel__foot">
+          <label class="clean-sheet-toggle">
+            <input type="checkbox" id="clean-sheet" ${match.cleanSheet ? 'checked' : ''} />
+            Portería a cero (solo suma a porteros y centrales)
+          </label>
+          <button class="btn btn--primary btn--sm" id="save-stats">Guardar estadísticas</button>
+        </div>
+      `;
+
+      $('#save-stats', host).addEventListener('click', async () => {
+        try {
+          const rowsToSave = [...host.querySelectorAll('[data-stat-row]')];
+          for (const row of rowsToSave) {
+            await api.setMatchStats(date, row.dataset.statRow, {
+              goals: $('[data-goals]', row).value,
+              assists: $('[data-assists]', row).value,
+            });
+          }
+          await api.setCleanSheet(date, $('#clean-sheet', host).checked);
+          toast('Estadísticas guardadas');
+          await load();
+        } catch (error) {
+          toast(error.message, 'error');
+        }
+      });
+    }
+
+    /** Una fila: el compañero a la izquierda y las notas 1-11 a la derecha. */
+    function renderRatingRow(player, usedNotes) {
+      const mine = myScores[player.id];
+      const takenByOthers = (note) => usedNotes.has(note) && usedNotes.get(note) !== player.id;
+      const avg = (match.averages || {})[player.id]?.average;
+      return `
+        <div class="rating-row ${player.id === ctx.state.user.id ? 'rating-row--mine' : ''}">
+          <span class="rating-row__who">
+            <span class="rating-row__num">${escapeHtml(player.number)}</span>
+            <span class="rating-row__name">${escapeHtml(player.displayName)}</span>
+          </span>
+          ${
+            avg !== undefined
+              ? `<span class="rating-row__avg" title="Nota media de los compañeros">${Number(avg).toFixed(1)}</span>`
+              : ''
+          }
+          <div class="note-grid" style="grid-column:1/-1">
+            ${Array.from({ length: 11 }, (_, i) => i + 1)
+              .map(
+                (note) => `
+              <button type="button" class="note-btn ${mine === note ? 'is-on' : ''}"
+                      data-note="${note}" data-target="${escapeHtml(player.id)}"
+                      ${takenByOthers(note) ? 'disabled' : ''}
+                      title="${
+                        takenByOthers(note)
+                          ? `El ${note} ya está puesto a otro compañero`
+                          : `Poner un ${note}`
+                      }">${note}</button>
+            `,
+              )
+              .join('')}
+          </div>
+        </div>
+      `;
+    }
 
     /* ------------------------------------------------------- Arrastre */
 
@@ -532,6 +749,15 @@ export async function renderPizarra(ctx) {
 
     /* ------------------------------------------------------- Acciones */
 
+    /** El botón de publicar cambia de texto según haya o no un once ese día. */
+    function paintPublishState() {
+      const button = $('#publish-board', ctx.outlet);
+      if (!button) return;
+      button.textContent = match.published
+        ? 'Publicar de nuevo (sustituir el once)'
+        : 'Publicar once del día';
+    }
+
     if (isAdmin) {
       $('#save-board', ctx.outlet).addEventListener('click', async () => {
         try {
@@ -571,6 +797,40 @@ export async function renderPizarra(ctx) {
         renderAll();
         markDirty();
       });
+
+      // Publicar es el gesto que abre la jornada de notas. Si ya había un once
+      // publicado ese día, avisa de que se sustituye.
+      $('#publish-board', ctx.outlet).addEventListener('click', async () => {
+        if (!slots.size) {
+          toast('Coloca al menos un jugador antes de publicar', 'error');
+          return;
+        }
+        if (
+          match.published
+          && !(await confirmAction(
+            'Ya hay un once publicado ese día. ¿Lo sustituyes por el actual? Las notas ya puestas se conservan.',
+          ))
+        ) {
+          return;
+        }
+        try {
+          const { match: published } = await api.publishMatch(date, {
+            formation: '4-3-3',
+            items: [...slots].map(([playerId, slot]) => ({
+              playerId,
+              x: slot.x,
+              y: slot.y,
+              vertical: true,
+            })),
+          });
+          Object.assign(match, published);
+          dirty = false;
+          toast('Once publicado: ya se pueden poner notas');
+          await load();
+        } catch (error) {
+          toast(error.message, 'error');
+        }
+      });
     }
 
     $('#pv-date', ctx.outlet).addEventListener('change', (event) => {
@@ -579,6 +839,7 @@ export async function renderPizarra(ctx) {
     });
 
     renderAll();
+    paintPublishState();
     if (data.lineup.updatedAt) {
       setMeta(`Última actualización: ${new Date(data.lineup.updatedAt).toLocaleString('es-ES')}`);
     } else {
