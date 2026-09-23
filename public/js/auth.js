@@ -19,8 +19,13 @@ let authFormCount = 0;
 /**
  * Formulario de acceso compartido por el modal, la página de acceso y el check-in.
  * Devuelve el elemento y un `submit()` que resuelve el usuario o devuelve false.
+ *
+ * `withButton` decide quién pone el botón de enviar: dentro del modal lo pone el
+ * propio modal en su pie (por eso allí se deja en false), pero fuera del modal
+ * —el check-in— no hay pie ninguno, así que el formulario tiene que traer el suyo
+ * o no habría forma de enviarlo.
  */
-export function createAuthForm({ positions = [], onDone } = {}) {
+export function createAuthForm({ positions = [], onDone, withButton = false } = {}) {
   // El modal de acceso y la página de check-in pueden tener un formulario montado
   // a la vez: sin sufijo, los `id` chocarían y los `label for` apuntarían a otro.
   const uid = `au${(authFormCount += 1)}`;
@@ -63,6 +68,14 @@ export function createAuthForm({ positions = [], onDone } = {}) {
       </div>
       <p class="login-hint" id="${uid}-rg-hint"></p>
     </div>
+
+    ${
+      withButton
+        ? `<button class="btn btn--primary auth__submit" id="${uid}-go" type="submit">
+             <span data-label-login>Entrar</span><span data-label-register hidden>Crear cuenta</span>
+           </button>`
+        : ''
+    }
   `;
 
   let mode = 'login';
@@ -93,6 +106,13 @@ export function createAuthForm({ positions = [], onDone } = {}) {
     });
     el.querySelector('[data-pane="login"]').hidden = !isLogin;
     el.querySelector('[data-pane="register"]').hidden = isLogin;
+    // El botón cambia de texto con la pestaña: «Entrar» o «Crear cuenta».
+    const loginLabel = el.querySelector('[data-label-login]');
+    const registerLabel = el.querySelector('[data-label-register]');
+    if (loginLabel && registerLabel) {
+      loginLabel.hidden = !isLogin;
+      registerLabel.hidden = isLogin;
+    }
     el.querySelector('.auth-tab.is-on')?.focus();
   };
 
@@ -122,6 +142,24 @@ export function createAuthForm({ positions = [], onDone } = {}) {
       return false;
     }
   };
+
+  // Fuera del modal el botón es la única forma de enviar; dentro, el modal ya
+  // pone el suyo en el pie. Enter en cualquier campo también envía, para no
+  // obligar a soltar el teclado.
+  if (withButton) {
+    const button = el.querySelector('.auth__submit');
+    button?.addEventListener('click', (event) => {
+      event.preventDefault();
+      submit();
+    });
+    el.querySelectorAll('input').forEach((input) => {
+      input.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        submit();
+      });
+    });
+  }
 
   return { el, submit, showTab, get mode() { return mode; } };
 }

@@ -51,15 +51,23 @@ arrancar() {
   cd "$RAIZ" || exit 1
 
   # La web no arranca sin PostgreSQL. Si no hay DATABASE_URL ni .env se avisa;
-  # y si el cluster es el local persistente (/workspace/pgdata) pero esta parado
-  # (tipico tras recrear el contenedor), se levanta solo.
+  # y si el cluster local persistente (/workspace/pgdata) esta parado (tipico
+  # tras recrear el contenedor), se levanta solo.
+  #
+  # Ojo: aqui NO se comprueba que exista el binario `pg_ctl`. Tras recrear el
+  # contenedor desaparece justo eso, asi que exigirlo impedia recuperarse
+  # precisamente cuando hace falta. El script de arranque ya instala lo que falte.
   if [ -z "${DATABASE_URL:-}" ] && [ -z "${ATLAS_DATABASE_URL:-}" ] && [ ! -f "$RAIZ/.env" ]; then
     echo "Aviso: no hay DATABASE_URL ni fichero .env."
     echo "  Copia .env.example a .env y pon ahi la cadena de conexion."
     echo "  O levanta el cluster local: ./scripts/setup-postgres.sh"
-  elif ! curl -s -o /dev/null --max-time 2 "http://localhost:5432" 2>/dev/null && \
-       [ -x /usr/lib/postgresql/17/bin/pg_ctl ] && sudo test -d /workspace/pgdata/data; then
-    if ! sudo -u postgres /usr/lib/postgresql/17/bin/pg_isready -h 127.0.0.1 -q 2>/dev/null; then
+  else
+    DB_VIVA=no
+    if [ -x /usr/lib/postgresql/17/bin/pg_isready ] && \
+       sudo -u postgres /usr/lib/postgresql/17/bin/pg_isready -h 127.0.0.1 -q 2>/dev/null; then
+      DB_VIVA=si
+    fi
+    if [ "$DB_VIVA" = "no" ] && sudo test -d /workspace/pgdata/data 2>/dev/null; then
       echo "La base de datos local esta parada; la arranco."
       "$RAIZ/scripts/setup-postgres.sh" "$PUERTO" >/dev/null 2>&1 || true
     fi

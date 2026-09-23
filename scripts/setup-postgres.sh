@@ -30,8 +30,9 @@ if ! esta_viva; then
 
   # Al recrear el contenedor se reinstala PostgreSQL y el usuario `postgres`
   # puede recibir otro UID. Los ficheros siguen siendo del UID antiguo, asi que
-  # sin este ajuste el cluster no arrancaria por permisos.
-  if sudo test -d "$PGDATA"; then
+  # sin este ajuste el cluster no arrancaria por permisos. `id -u postgres` solo
+  # tiene sentido si el usuario ya existe (tras instalar el paquete lo crea).
+  if sudo test -d "$PGDATA" && id -u postgres >/dev/null 2>&1; then
     UID_ACTUAL=$(id -u postgres)
     UID_DATOS=$(sudo stat -c %u "$PGDATA")
     if [ "$UID_ACTUAL" != "$UID_DATOS" ]; then

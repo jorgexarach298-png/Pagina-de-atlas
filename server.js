@@ -449,7 +449,7 @@ app.post(
   '/api/checkin/me',
   requireAuth,
   asyncRoute(async (req, res) => {
-    if (req.player.isAdmin) {
+    if (!req.player.isPlayer) {
       return res.status(400).json({ error: 'La cuenta de administrador no cuenta para el check-in' });
     }
     const { status, message, date } = req.body || {};

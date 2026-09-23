@@ -29,6 +29,11 @@ const ctx = {
     $('#view').innerHTML = markup;
   },
   onUserChange: () => paintSession(),
+  // Las vistas lo necesitan para ofrecer un botón de acceso en su propio
+  // contenido: si solo se puede entrar desde la cabecera, media web (la portada,
+  // el check-in) te dice «inicia sesión» sin darte dónde.
+  openLogin,
+  reload: () => render(),
 };
 
 /* ------------------------------------------------------------ Sesión */
@@ -54,14 +59,18 @@ function paintSession() {
       }
       <span class="session__meta">
         <b>${escapeHtml(user.displayName)}</b>
-        <span>${user.isAdmin ? 'Administrador' : escapeHtml(user.position)}</span>
+        <span>${
+          user.isPlayer
+            ? `${escapeHtml(user.position)}${user.isAdmin ? ' · Administrador' : ''}`
+            : 'Administrador'
+        }</span>
       </span>
     </button>
   `;
   $('#open-account').addEventListener('click', openAccount);
 }
 
-function openLogin(onDone) {
+function openLogin(onDone, initialTab = 'login') {
   const auth = createAuthForm({
     positions: state.positions,
     onDone: (user) => {
@@ -70,6 +79,8 @@ function openLogin(onDone) {
       onDone?.(user);
     },
   });
+  // Permite abrir el diálogo directamente en «Registrarme» (botón de la portada).
+  if (initialTab === 'register') auth.showTab('register');
 
   openModal({
     title: 'Acceso a ATLAS',

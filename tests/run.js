@@ -74,6 +74,10 @@ async function startServer(dataDir) {
       // Cada suite usa su propio secreto: así las cookies de una no valen en la
       // siguiente, igual que pasaba con los datos en fichero.
       SESSION_SECRET: 'secreto-de-pruebas-atlas-0123456789abcdef',
+      // Credenciales del mánager de pruebas, fijadas aquí para que las suites no
+      // dependan del valor por defecto si algún día cambia.
+      ATLAS_ADMIN_USER: 'admin',
+      ATLAS_ADMIN_PASSWORD: 'atlas-admin',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

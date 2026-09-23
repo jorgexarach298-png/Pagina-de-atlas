@@ -79,7 +79,8 @@ el volumen local puede no existir.
 
 | Cuenta | ID | Contraseña |
 | --- | --- | --- |
-| Administrador | `admin` | `atlas-admin` |
+| Administrador | `admin` | `123456780` |
+| Mánager que además juega | `RodriKTV` | `mk3Nphp2` |
 | Cada miembro | su ID de la lista | la que elija al activar su cuenta |
 
 Los miembros **no** tienen contraseña inicial. Cada uno entra en **Registrarme** y
@@ -87,6 +88,15 @@ activa su cuenta escribiendo su ID de la plantilla (por ejemplo `tonii_gk`) y la
 contraseña que quiera; a partir de ahí entra con ese mismo ID. Solo se admiten los
 IDs que ya están en la plantilla, así que nadie de fuera puede crearse una cuenta.
 El formulario muestra los IDs que siguen sin activar.
+
+`admin` es la cuenta técnica: sirve para gestionar y no juega, así que no aparece
+en la Plantilla ni firma check-in. `RodriKTV` es mánager **y** jugador a la vez:
+conserva su dorsal y su posición, sale en su carta y firma su propio check-in.
+Para dar permisos a alguien sin sacarlo de la plantilla:
+
+```bash
+node scripts/set-credentials.js <ID> <contraseña> --admin
+```
 
 Si alguien olvida su contraseña, el administrador abre su ficha en **Plantilla** (✎)
 y pulsa **Restablecer cuenta**: el ID vuelve a la lista de registro y el miembro elige

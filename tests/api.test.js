@@ -135,6 +135,29 @@ async function login(username, password) {
   check('la plantilla trae a los 16 jugadores', players.length === 16, `${players.length}`);
   check('cada jugador trae estadísticas', players.every((p) => p.stats && typeof p.stats.played === 'number'));
 
+  /* Un mánager que además juega: dar permisos no puede borrarlo del roster. */
+  const promotable = players.find((p) => p.id !== candidate.id);
+  await sql('UPDATE players SET is_admin = true WHERE id = $1', [promotable.id]);
+  const afterPromotion = await call('GET', '/api/roster');
+  const stillListed = (afterPromotion.json?.players || []).some((p) => p.id === promotable.id);
+  check('un jugador con permisos de mánager sigue en la plantilla', stillListed, promotable.id);
+  check(
+    'y conserva su dorsal y su posición',
+    (afterPromotion.json?.players || []).some(
+      (p) => p.id === promotable.id && p.number === promotable.number && p.position === promotable.position,
+    ),
+  );
+  await sql('UPDATE players SET is_admin = false WHERE id = $1', [promotable.id]);
+
+  /* La cuenta técnica de administración no es jugador: no sale ni ficha. */
+  check('la cuenta de administración no aparece en la plantilla', !players.some((p) => p.username === 'admin'));
+
+  const adminCheckin = await call('POST', '/api/checkin/me', {
+    body: { date: new Date().toISOString().slice(0, 10), status: 'yes' },
+    jar: admin.jar,
+  });
+  check('la cuenta que no juega no firma check-in', adminCheckin.status === 400, `status ${adminCheckin.status}`);
+
   // Los jugadores tienen que estar en PostgreSQL de verdad, no en memoria.
   const stored = await sql('SELECT count(*)::int AS n FROM players');
   check('los jugadores están guardados en la base de datos', stored[0].n === 17, `${stored[0].n}`);

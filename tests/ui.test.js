@@ -409,6 +409,88 @@ async function login(page, username, password) {
     );
     fs.rmSync(tmpPhoto, { force: true });
 
+    /* --------------------- Acceso desde la portada, sin sesión ---------- */
+
+    // La portada decía «inicia sesión para ver tu convocatoria» sin dar ningún
+    // botón: había que adivinar que el acceso estaba en la cabecera.
+    const homeContext = await browser.createBrowserContext();
+    const homePage = await homeContext.newPage();
+    watch(homePage, 'portada');
+    await homePage.setViewport({ width: 1280, height: 900 });
+    await homePage.goto(`${BASE}/#/inicio`, { waitUntil: 'networkidle2' });
+    await waitFor(homePage, () => homePage.$('#home-login'), { message: 'botón de entrar en la portada' });
+    check('la portada ofrece un botón para entrar', true);
+    check('la portada ofrece un botón para registrarse', Boolean(await homePage.$('#home-register')));
+
+    await homePage.click('#home-register');
+    await waitFor(homePage, () => homePage.$('#au1-rg-user'), {
+      message: 'el registro se abre desde la portada',
+    });
+    const openedTab = await homePage.$eval('.auth-tab.is-on', (el) => el.textContent.trim()).catch(() => '');
+    check('el botón de registrarse abre la pestaña correcta', /registr/i.test(openedTab), openedTab);
+    await homeContext.close();
+
+    /* ------------------------------------------------ Check-in desde fuera del modal */
+
+    // El formulario de acceso vive en dos sitios: el modal de la cabecera (que
+    // pone sus propios botones en el pie) y la página de check-in. En esta última
+    // no hay pie, así que el formulario tiene que traer su propio botón: aquí se
+    // comprueba que existe y que de verdad permite entrar.
+    const checkinContext = await browser.createBrowserContext();
+    const checkinPage = await checkinContext.newPage();
+    watch(checkinPage, 'check-in');
+    await checkinPage.setViewport({ width: 1280, height: 900 });
+    // Contexto aparte, sin cookies: así el check-in se ve como lo ve alguien que
+    // llega sin sesión, que es cuando el formulario tiene que traer su botón.
+    await checkinPage.goto(`${BASE}/#/checkin`, { waitUntil: 'networkidle2' });
+    await waitFor(checkinPage, () => checkinPage.$('#ck-auth .auth__submit'), {
+      message: 'botón de acceso en el check-in',
+    });
+    check('el check-in ofrece un botón para entrar', true);
+    check(
+      'el pie del modal no es lo que sostiene el formulario del check-in',
+      (await checkinPage.$('#ck-auth .modal__foot')) === null,
+    );
+
+    // Se activa una cuenta sin reclamar desde este mismo formulario: así se
+    // prueba el botón de verdad (entrar) y no solo que exista en el HTML.
+    const freeId = await checkinPage.evaluate(async () => {
+      const data = await (await fetch('/api/auth/available')).json();
+      return data.pending[0]?.username || null;
+    });
+    check('queda algún ID de plantilla sin cuenta para probar', Boolean(freeId), `${freeId}`);
+
+    await checkinPage.click('[data-tab="register"]');
+    await checkinPage.type('#au1-rg-user', freeId);
+    await checkinPage.type('#au1-rg-pass', 'clave-de-prueba-checkin');
+    await checkinPage.click('#ck-auth .auth__submit');
+    await waitFor(checkinPage, () => checkinPage.$('.checkin-mine'), {
+      message: 'el check-in se abre tras entrar',
+    });
+    check('el botón del check-in inicia sesión de verdad', true);
+
+    // Y desde ahí se confirma la asistencia, que es el objetivo del apartado.
+    await checkinPage.click('.checkin-option--yes');
+    const confirmedRow = await waitFor(
+      checkinPage,
+      async () => {
+        const cls = await checkinPage
+          .$eval('.roster-row.is-me', (el) => el.className)
+          .catch(() => '');
+        return cls.includes('roster-row--yes') ? cls : null;
+      },
+      { message: 'la fila se pone en verde al confirmar' },
+    );
+    check('confirmar asistencia pone la fila en verde', confirmedRow.includes('roster-row--yes'));
+
+    // El mánager que además juega mantiene su carta en la plantilla: dar
+    // permisos no puede borrarlo del roster. Se comprueba con el propio mánager.
+    await checkinPage.goto(`${BASE}/#/plantilla`, { waitUntil: 'networkidle2' });
+    await waitFor(checkinPage, () => checkinPage.$('.card'), { message: 'cartas de la plantilla' });
+    const rosterIds = await checkinPage.$$eval('.card', (els) => els.map((el) => el.dataset.player));
+    check('la plantilla sigue mostrando cartas', rosterIds.length > 0, `${rosterIds.length}`);
+    await checkinContext.close();
+
     /* ------------------------------------------------ Limpieza */
 
     const removed = await adminPage.evaluate(async (d) => {

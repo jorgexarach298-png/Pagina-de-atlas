@@ -1,7 +1,7 @@
 'use strict';
 
 import { api } from '../api.js';
-import { escapeHtml, formatDayLong, initials, relativeDate, todayISO } from '../utils.js';
+import { $, escapeHtml, formatDayLong, initials, relativeDate, todayISO } from '../utils.js';
 
 /**
  * Portada: identidad del club, resumen de convocatoria y últimos hitos.
@@ -60,8 +60,13 @@ export async function renderHome(ctx) {
       ${
         checkin
           ? renderCheckinSummary(checkin)
-          : `<p class="empty-state"><b>Inicia sesión para ver tu convocatoria</b>
-               Entra con tu ID de miembro y confirma si estarás en el próximo partido.</p>`
+          : `<div class="empty-state"><b>Inicia sesión para ver tu convocatoria</b>
+               Entra con tu ID de miembro y confirma si estarás en el próximo partido.
+               <div class="empty-state__actions">
+                 <button class="btn btn--primary" id="home-login">Entrar</button>
+                 <button class="btn" id="home-register">Registrarme</button>
+               </div>
+             </div>`
       }
     </section>
 
@@ -130,6 +135,13 @@ export async function renderHome(ctx) {
   ctx.outlet.querySelectorAll('.reveal').forEach((node, index) => {
     node.style.animationDelay = `${index * 90}ms`;
   });
+
+  // Los botones de acceso de la portada abren el mismo diálogo que el de la
+  // cabecera, con la pestaña que corresponda.
+  $('#home-login', ctx.outlet)?.addEventListener('click', () => ctx.openLogin?.(ctx.reload));
+  $('#home-register', ctx.outlet)?.addEventListener('click', () =>
+    ctx.openLogin?.(ctx.reload, 'register'),
+  );
 }
 
 function renderCheckinSummary(checkin) {

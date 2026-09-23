@@ -123,12 +123,33 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) +
 - `--dump-dom` sirve para confirmar que el contenido se renderiza aunque el
   screenshot salga oscuro.
 
+## Formulario de acceso (`public/js/auth.js`)
+- `createAuthForm()` se monta en **dos** sitios: el modal de la cabecera
+  (`app.js`) y la página de check-in (`views/checkin.js`). Dentro del modal los
+  botones los pone `openModal` en su pie, así que ahí se llama sin `withButton`.
+  **Fuera del modal no hay pie**: hay que pasar `withButton: true` o el formulario
+  se queda sin forma de enviarse. Ese fue el fallo de «no aparece el botón»: el
+  check-in montaba el formulario a secas.
+- Al añadir un sitio nuevo que monte este formulario, pasar `withButton: true`
+  salvo que ya haya un pie propio del que colgar el botón.
+- Las pruebas de UI **no** cubrían el check-in; ahora sí (bloque «Check-in desde
+  fuera del modal» en `tests/ui.test.js`), y usan un contexto de navegador sin
+  cookies para verlo como lo ve alguien sin sesión.
+
 ## Autenticación
 - Admin por defecto: `admin` / `atlas-admin` (configurable con `ATLAS_ADMIN_USER`
   y `ATLAS_ADMIN_PASSWORD`). Solo se usa al sembrar la base de datos la primera vez.
+  En la instalación del club las credenciales ya están cambiadas: ver «Accesos» del
+  `README.md`. Para fijarlas en cualquier entorno: `node scripts/set-credentials.js`.
 - Los miembros **no** tienen contraseña inicial: activan su cuenta desde «Registrarme»
   con su ID de plantilla. Solo se admiten IDs que ya existan, así que
   `POST /api/auth/register` no crea jugadores nuevos (`claimAccount()`).
+- **`is_admin` y `is_player` son cosas distintas.** `is_admin` da acceso al panel;
+  `is_player` decide si alguien es jugador (sale en la Plantilla, en la Pizarra y
+  firma check-in). Antes solo existía `is_admin` y el roster filtraba con él, así que
+  dar permisos a un jugador lo borraba de su propia plantilla. Un mánager que juega
+  lleva `is_admin = true` **y** `is_player = true`; la cuenta técnica `admin` lleva
+  `is_player = false`. Al filtrar el roster, usar `is_player`, nunca `is_admin`.
 - El secreto de sesión se guarda en `settings` (no en `data/session.key`) para que los
   inicios de sesión sobrevivan a un reinicio incluso con disco efímero; se puede
   sobrescribir con `SESSION_SECRET`.
