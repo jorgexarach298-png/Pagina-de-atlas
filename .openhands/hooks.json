@@ -1,0 +1,16 @@
+{
+  "session_start": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "name": "arrancar-atlas",
+          "command": "bash -lc 'cd /workspace/project/Pagina-de-atlas && ./atlas.sh start >> data/atlas-hook.log 2>&1 || true'",
+          "async": true,
+          "timeout": 30
+        }
+      ]
+    }
+  ]
+}

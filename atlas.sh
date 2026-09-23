@@ -21,9 +21,18 @@ PIDFILE="$RAIZ/data/server.pid"
 pid_vivo() {
   [ -f "$PIDFILE" ] || return 1
   local pid
-  pid="$(cat "$PIDFILE" 2>/dev/null)"
+  pid="$(tr -d '[:space:]' < "$PIDFILE" 2>/dev/null)"
   [ -n "$pid" ] || return 1
+  case "$pid" in *[!0-9]*) return 1 ;; esac
   kill -0 "$pid" 2>/dev/null || return 1
+  # Tras un reinicio del contenedor el PID puede haberse reutilizado por otro
+  # proceso: solo vale si sigue siendo nuestro `node server.js`.
+  local cmd
+  cmd="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+  case "$cmd" in
+    *server.js*) ;;
+    *) return 1 ;;
+  esac
   echo "$pid"
 }
 

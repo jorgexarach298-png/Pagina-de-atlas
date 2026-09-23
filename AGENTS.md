@@ -122,11 +122,31 @@ da URL pública (`work-1-...`); `npm start` usa el 3000.
 
 El proceso se lanza con `setsid nohup`, deja el log en `data/server.log` y el PID
 en `data/server.pid`. `start` no duplica si ya hay uno, y si encuentra un
-`node server.js` suelto (sin pidfile) lo detiene antes de arrancar.
+`node server.js` suelto (sin pidfile) lo detiene antes de arrancar. `pid_vivo()`
+comprueba además que el PID del pidfile sigue siendo un `node server.js`: tras un
+reinicio del contenedor el número puede reutilizarse por otro proceso y el
+pidfile viejo bloqueaba el arranque.
 
-**Ojo:** el servidor no se relanza solo cuando el contenedor se reinicia. Si la
-web deja de responder, ejecuta `./atlas.sh start`. Tanto el código como
-`data/atlas.json` sobreviven a esos reinicios.
+## Persistencia y auto-arranque
+
+Solo `/workspace` es un volumen propio que sobrevive a los reinicios del
+contenedor; `/home`, `/etc` y `/tmp` viven en un overlay efímero. Por eso el
+código y `data/` (incluidas las fotos de `data/uploads/`) persisten, pero
+cualquier cosa escrita fuera de `/workspace` se pierde.
+
+Lo que **no** sobrevive es el proceso: el runtime apaga el contenedor por
+inactividad (`OH_RUNTIME_IDLE_TIMEOUT_SECONDS`) y al volver arranca uno nuevo, así
+que `node server.js` no se relanza solo. Para cubrirlo, `.openhands/hooks.json`
+define un hook `session_start` (async) que ejecuta `./atlas.sh start`; es
+idempotente, así que si el servidor ya está vivo no hace nada. Verificado: al
+lanzar una conversación con ese `hook_config`, el servidor se levanta solo.
+
+Ese hook solo actúa cuando la conversación recibe el `hook_config` (el runtime lo
+entrega vía `POST /api/hooks` con `project_dir`); no se autocargan por sí solos
+en todas las conversaciones, así que no sustituye a `./atlas.sh start`.
+No hay cron, systemd ni supervisor en este contenedor, de modo que no existe un
+auto-arranque a nivel de servicio: si la web deja de responder, ejecuta
+`./atlas.sh start`.
 
 ## Estado de datos
 `data/atlas.json`, `data/session.key` y `data/uploads/*` están en `.gitignore`
