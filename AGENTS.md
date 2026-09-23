@@ -186,6 +186,23 @@ reinicios y los datos están en PostgreSQL, así que tampoco se pierden.
 servidor no arranca. Espera hasta 30 s a que responda, porque conectar a una base
 de datos en la nube puede tardar más que en local.
 
+### Recuperarse de un reinicio del contenedor
+
+En este entorno el contenedor se recrea de vez en cuando y **se lleva por delante
+PostgreSQL**: desaparece el binario, el clúster y las bases de datos. Los ficheros
+del proyecto sí sobreviven, así que se puede reconstruir todo sin perder nada:
+
+```
+./scripts/setup-postgres.sh          # reinstala, crea usuario y bases, reimporta y arranca
+./scripts/setup-postgres.sh 3000     # opcional: otro puerto
+```
+
+El script es idempotente. Solo reimporta `data/atlas.json` si la base de datos no
+tiene tablas, así que repetirlo no duplica ni pisa datos. Si ya no queda el JSON
+(por ejemplo, porque el club ya trabaja solo contra la base de datos), hay que
+restaurar desde una copia o desde el respaldo del proveedor: por eso conviene
+tener el `.env` apuntando a Supabase en cuanto se despliegue de verdad.
+
 ## Estado de datos
 Los datos del club viven en PostgreSQL. Solo quedan ficheros locales en `data/`:
 `data/uploads/*` (fotos), `data/session.key` (respaldo del secreto si la base de datos

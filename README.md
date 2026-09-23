@@ -53,6 +53,19 @@ DATABASE_URL="postgresql://...supabase..." npm run migrate
 guarda la ruta, no la imagen; mover los ficheros a un almacenamiento en la nube
 (Supabase Storage, S3) sería el paso siguiente.
 
+### Si el contenedor se reinicia (solo en este entorno de desarrollo)
+
+El contenedor se recrea de vez en cuando y se lleva por delante PostgreSQL. Un script
+reconstruye todo: reinstala el servidor, crea el usuario y las bases de datos, reimporta
+`data/atlas.json` si hace falta y arranca la web.
+
+```bash
+./scripts/setup-postgres.sh
+```
+
+Es idempotente, así que se puede repetir sin miedo. **Con Supabase configurado no hace
+falta**: los datos viven fuera del contenedor y basta con `./atlas.sh start`.
+
 ## Accesos
 
 | Cuenta | ID | Contraseña |
