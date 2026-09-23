@@ -21,7 +21,6 @@ let authFormCount = 0;
  * Devuelve el elemento y un `submit()` que resuelve el usuario o devuelve false.
  */
 export function createAuthForm({ positions = [], onDone } = {}) {
-  const list = positions.length ? positions : POSITION_FALLBACK;
   // El modal de acceso y la página de check-in pueden tener un formulario montado
   // a la vez: sin sufijo, los `id` chocarían y los `label for` apuntarían a otro.
   const uid = `au${(authFormCount += 1)}`;
@@ -46,50 +45,43 @@ export function createAuthForm({ positions = [], onDone } = {}) {
         </div>
       </div>
       <p class="login-hint">
-        Entra con el ID con el que apareces en la plantilla. ¿Primera vez? Pásate a
-        <strong>Registrarme</strong> y crea tu cuenta.
+        Entra con el ID con el que apareces en la plantilla.
       </p>
     </div>
 
     <div data-pane="register" hidden>
-      <div class="form-grid">
+      <div class="form-grid" style="grid-template-columns:1fr">
         <div class="field">
-          <label for="${uid}-rg-user">ID de miembro</label>
-          <input class="input" id="${uid}-rg-user" autocomplete="username" placeholder="cómo quieres aparecer" />
+          <label for="${uid}-rg-user">Tu ID en la plantilla</label>
+          <input class="input" id="${uid}-rg-user" autocomplete="username" placeholder="ej. tonii_gk" />
         </div>
         <div class="field">
-          <label for="${uid}-rg-name">Nombre en la carta</label>
-          <input class="input" id="${uid}-rg-name" maxlength="40" placeholder="tu nombre" />
-        </div>
-        <div class="field">
-          <label for="${uid}-rg-number">Dorsal</label>
-          <input class="input" id="${uid}-rg-number" inputmode="numeric" maxlength="2" placeholder="9" />
-        </div>
-        <div class="field">
-          <label for="${uid}-rg-pos">Posición</label>
-          <select class="input" id="${uid}-rg-pos">
-            ${list
-              .map(
-                (p) =>
-                  `<option value="${escapeHtml(p.key)}">${escapeHtml(p.group)} · ${escapeHtml(p.label)}</option>`,
-              )
-              .join('')}
-          </select>
-        </div>
-        <div class="field" style="grid-column:1/-1">
-          <label for="${uid}-rg-pass">Contraseña</label>
+          <label for="${uid}-rg-pass">Contraseña que quieres usar</label>
           <input class="input" id="${uid}-rg-pass" type="password" autocomplete="new-password"
                  placeholder="mínimo 6 caracteres" />
         </div>
       </div>
-      <p class="login-hint">
-        Al registrarte entras directamente: ya puedes firmar el check-in y subir tu foto
-        desde tu carta en la Plantilla.
-      </p>
+      <p class="login-hint" id="${uid}-rg-hint"></p>
     </div>
   `;
 
   let mode = 'login';
+
+  /** Muestra qué IDs de la plantilla siguen sin cuenta, para orientar al que llega. */
+  const paintHint = async () => {
+    const hint = $(`#${uid}-rg-hint`, el);
+    if (!hint) return;
+    try {
+      const { pending } = await api.pendingAccounts();
+      hint.innerHTML = pending.length
+        ? `Solo pueden registrarse los IDs de la plantilla. Sin cuenta todavía:
+           <strong>${pending.map((p) => escapeHtml(p.username)).join(', ')}</strong>.`
+        : 'Todos los IDs de la plantilla ya tienen cuenta. Entra con tu contraseña.';
+    } catch {
+      hint.textContent = 'Escribe el ID con el que apareces en la plantilla del club.';
+    }
+  };
+  paintHint();
 
   const showTab = (next) => {
     mode = next;
@@ -115,15 +107,12 @@ export function createAuthForm({ positions = [], onDone } = {}) {
         mode === 'register'
           ? await api.register({
               username: $(`#${uid}-rg-user`, el).value.trim(),
-              displayName: $(`#${uid}-rg-name`, el).value.trim(),
-              number: $(`#${uid}-rg-number`, el).value.trim(),
-              position: $(`#${uid}-rg-pos`, el).value,
               password: $(`#${uid}-rg-pass`, el).value,
             })
           : await api.login($(`#${uid}-lg-user`, el).value.trim(), $(`#${uid}-lg-pass`, el).value);
       toast(
         mode === 'register'
-          ? `Cuenta creada. Bienvenido, ${user.displayName}`
+          ? `Cuenta activada. Bienvenido, ${user.displayName}`
           : `Bienvenido, ${user.displayName}`,
       );
       onDone?.(user);

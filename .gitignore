@@ -1,8 +1,10 @@
 node_modules/
+# Restos de la version con ficheros JSON, por si alguien migra desde ahi.
 data/atlas.json
 data/atlas.json.tmp
 data/atlas.json.broken-*
 data/session.key
+data/sessions.json
 data/uploads/*
 !data/uploads/.gitkeep
 .env

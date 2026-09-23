@@ -2,22 +2,86 @@
 
 ## Proyecto
 Web oficial del club ATLAS (EA SPORTS FC 27 Clubes Pro). Interfaz en español.
-Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persistencia JSON.
+Node/Express + SPA en JavaScript puro (sin build step ni frameworks) +
+**PostgreSQL** (compatible con Supabase).
 
 ## Comandos
 - `npm install` — instalar dependencias.
 - `npm start` — arrancar en http://localhost:3000 (`PORT` configurable).
-- No hay suite de tests. Verificar con `curl` contra la API o con el navegador
-  (Puppeteer con el Chromium del sistema sirve para probar los flujos táctiles).
+- `npm run migrate` — volcar el antiguo `data/atlas.json` a la base de datos.
+- `npm test` — suite completa (API + interfaz). Ver la sección «Pruebas».
+
+## Base de datos
+- PostgreSQL. La conexión sale de `DATABASE_URL` / `ATLAS_DATABASE_URL`, o de las
+  variables estándar (`PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`). `.env` se lee
+  al arrancar (`lib/env.js`); ver `.env.example`.
+- `lib/db.js` — pool, `query()`, `transaction()` y `ensureSchema()`.
+  - Se redefinen los *type parsers* de `pg`. **DATE se devuelve como cadena**
+    (`YYYY-MM-DD`), porque todo el código compara fechas como texto. TIMESTAMP y
+    TIMESTAMPTZ se normalizan a ISO: PostgreSQL escribe el desfase como `+00` y
+    `new Date()` solo acepta `+00:00`, así que hay que arreglarlo antes de parsear.
+  - `double precision` en `x`/`y` (no `real`) para no perder precisión al guardar.
+- `lib/db-schema.js` — la DDL, en un único sitio, para que las pruebas creen
+  exactamente la misma estructura.
+- Las claves ajenas van **en cascada**: borrar un jugador o retirar un partido limpia
+  fichas, estadísticas, papeletas y check-ins sin código extra.
+- `lib/store.js` — única fuente de datos, **todo asíncrono**. Mantiene la misma forma
+  de objeto que la versión JSON, así que el frontend no cambió.
+  - `init()` crea el esquema y, si `players` está vacía, siembra la plantilla.
+  - El `session_secret` se guarda en `settings`: en la nube el disco es efímero y un
+    secreto nuevo en cada arranque invalidaría todas las sesiones.
+
+## Pruebas
+- `tests/run.js` levanta un servidor por suite en el puerto `4123` contra una base de
+  datos **aparte** (`ATLAS_TEST_DATABASE_URL`, por defecto `atlas_test`), que se vacía
+  (`DROP SCHEMA public CASCADE`) antes de cada suite. Nunca apuntar a la base del club.
+- `tests/api.test.js` — API con `fetch` y gestión manual de la cookie de sesión.
+  **La cookie se llama `atlas.sid`** (no `connect.sid`): usar el nombre equivocado
+  hace que todas las peticiones autenticadas devuelvan 401. Tiene un helper `sql()`
+  para comprobar en la base de datos lo que no se ve por la API.
+- `tests/ui.test.js` — Puppeteer con el Chromium del sistema (`/usr/bin/chromium`,
+  o `CHROME_PATH`). Tres trampas que cuestan tiempo:
+  - `page.goto()` al **mismo hash** no recarga la SPA; hay que añadir algo a la URL
+    (p. ej. `#/pizarra?date=...`) para forzar el re-render.
+  - Los modales se **apilan** en el DOM (`confirmAction` sobre el modal de edición),
+    así que hay que leer el **último** `.modal`, no el primero.
+  - Los `ElementHandle` de listas que se repintan (el banquillo) quedan obsoletos:
+    volver a consultarlos en cada iteración.
 
 ## Arquitectura
 - `server.js` — Express, sesiones (`express-session`), guardas `requireAdmin` /
   `requireAuth`, API REST bajo `/api/*` y servido estático de `public/` y `/uploads`.
-- `lib/store.js` — única fuente de datos. `loadDatabase()` crea y siembra
-  `data/atlas.json` si no existe. Exporta CRUD y utilidades de fecha
+  - `buildApp()` es **async** y monta los middlewares en orden: sesión → estáticos →
+    rutas → respaldo de la SPA → errores. Las rutas se registran dentro de
+    `registerRoutes()`, y no al cargar el módulo, porque el middleware de sesión
+    necesita un secreto que se lee de la base de datos: hasta que no está, ninguna
+    ruta debe existir (Express atiende en orden de registro).
+  - `express-session` se instala dentro de `buildApp()`, no en el cuerpo del módulo.
+    Si se registra después de las rutas, no se aplica a ninguna y **todo** devuelve 401.
+  - El servidor no escucha hasta que `store.init()` termina: conectar y crear el
+    esquema son operaciones de red.
+- `lib/store.js` — única fuente de datos. Exporta CRUD y utilidades de fecha
   (`todayISO()`, `dateInTimeZone()`). La zona horaria por defecto es `Europe/Madrid`.
+  - **Cuentas:** los miembros no tienen contraseña inicial. `claimAccount()` activa una
+    cuenta desde su ID de plantilla y `resetAccount()` la devuelve a ese estado.
+    `defaultPasswordFor()` se conserva solo para detectar cuentas antiguas en la
+    migración; no se asigna a nadie.
+  - **Partidos:** `matches` guarda un partido por fecha, con `match_items` (el once),
+    `match_ballots`/`match_scores` (papeletas de notas 1-11), `match_stats`
+    (goles/asistencias) y `clean_sheet` (portería a cero del equipo). `rosterStats()`
+    calcula PJ, goles, asistencias y media de notas, y es lo que alimenta las cartas.
+  - **Porterías imbatidas:** `clean_sheet` es del partido, no de cada jugador. Suma solo
+    a `CLEAN_SHEET_POSITIONS` (`POR`, `DFC`) y solo si el jugador entró en el once. Las
+    cartas de esas dos posiciones muestran una columna «Imbatidas»; el resto no, porque
+    `cleanSheetsEligible` va en las estadísticas de cada jugador.
+- `lib/session-store.js` — almacén de sesiones en la tabla `sessions`, para que un
+  reinicio del servidor no expulse a quien estaba dentro. Antes era un fichero
+  (`data/sessions.json`) con volcado diferido y `touch()` que solo reescribía cada 12 h;
+  con PostgreSQL eso sobra: cada `touch()` es un `UPDATE` de una fila, y el
+  `session_secret` vive en `settings` para que las cookies sobrevivan al reinicio.
 - `lib/uploads.js` — convierte data URLs de imagen en ficheros dentro de `data/uploads/`
-  y devuelve la ruta pública `/uploads/<archivo>`.
+  y devuelve la ruta pública `/uploads/<archivo>`. La base de datos guarda la ruta, no
+  la imagen: mover los ficheros a un almacenamiento en la nube está pendiente.
 - `public/js/app.js` — router por hash, estado de sesión y render de cabecera.
 - `public/js/auth.js` — formulario de acceso/registro compartido por el modal de la
   cabecera y la página de check-in. `createAuthForm()` devuelve `{ el, submit() }`;
@@ -35,6 +99,9 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persisten
   Para validar sintaxis del frontend hay que cargar la página en el navegador.
 - Escapar siempre los datos de usuario con `escapeHtml` antes de insertarlos en HTML.
 - Los ids de jugador se derivan del username (minúsculas, no alfanumérico a guion).
+- **Nunca llamar a `close()` a secas** en un modal: resuelve a `window.close()` y el
+  navegador cierra la pestaña, lo que parece que la web te ha expulsado. Los modales
+  devuelven un manejador con `.close()`; usar ese (`handle.close()`).
 
 ## Identidad visual y paleta
 - El escudo vive en `public/img/escudo.png` y se usa en la cabecera, la portada
@@ -58,12 +125,13 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persisten
 
 ## Autenticación
 - Admin por defecto: `admin` / `atlas-admin` (configurable con `ATLAS_ADMIN_USER`
-  y `ATLAS_ADMIN_PASSWORD`).
-- Contraseña inicial de cada miembro: `atlas` + su dorsal (p. ej. `atlas9`).
-- Cualquiera puede registrarse desde la pestaña «Registrarme» del formulario de
-  acceso (`POST /api/auth/register`), eligiendo ID, dorsal, posición y contraseña.
-- El secreto de sesión se persiste en `data/session.key` para que los inicios de
-  sesión sobrevivan a un reinicio; se puede sobrescribir con `SESSION_SECRET`.
+  y `ATLAS_ADMIN_PASSWORD`). Solo se usa al sembrar la base de datos la primera vez.
+- Los miembros **no** tienen contraseña inicial: activan su cuenta desde «Registrarme»
+  con su ID de plantilla. Solo se admiten IDs que ya existan, así que
+  `POST /api/auth/register` no crea jugadores nuevos (`claimAccount()`).
+- El secreto de sesión se guarda en `settings` (no en `data/session.key`) para que los
+  inicios de sesión sobrevivan a un reinicio incluso con disco efímero; se puede
+  sobrescribir con `SESSION_SECRET`.
 
 ## Pizarra táctica
 - El campo es **vertical** (proporción 3/4). En las coordenadas, `y = 0` es la
@@ -111,14 +179,24 @@ en `data/server.pid`. `start` no duplica si ya hay uno, y si encuentra un
 `node server.js` suelto (sin pidfile) lo detiene antes de arrancar.
 
 **Ojo:** el servidor no se relanza solo cuando el contenedor se reinicia. Si la
-web deja de responder, ejecuta `./atlas.sh start`. Tanto el código como
-`data/atlas.json` sobreviven a esos reinicios.
+web deja de responder, ejecuta `./atlas.sh start`. El código sobrevive a esos
+reinicios y los datos están en PostgreSQL, así que tampoco se pierden.
+
+`atlas.sh` avisa si no encuentra `DATABASE_URL` ni `.env`: sin base de datos el
+servidor no arranca. Espera hasta 30 s a que responda, porque conectar a una base
+de datos en la nube puede tardar más que en local.
 
 ## Estado de datos
-`data/atlas.json`, `data/session.key` y `data/uploads/*` están en `.gitignore`
-(solo se versiona `data/uploads/.gitkeep`). Para volver al estado inicial basta
-con borrar `data/atlas.json` y `data/session.key` y reiniciar el servidor.
+Los datos del club viven en PostgreSQL. Solo quedan ficheros locales en `data/`:
+`data/uploads/*` (fotos), `data/session.key` (respaldo del secreto si la base de datos
+no admite escritura), `server.log` y `server.pid`. El antiguo `data/atlas.json` y
+`data/sessions.json` ya no se usan: se migran con `npm run migrate`.
 
 ## Riesgos conocidos
-- La persistencia es un único fichero JSON reescrito en cada cambio: no hay bloqueo
-  entre procesos. Ejecutar una sola instancia del servidor.
+- Ya no hay un fichero JSON reescrito entero: cada cambio escribe solo sus filas, así
+  que varias instancias del servidor pueden convivir sobre la misma base de datos.
+- Las **fotos** siguen siendo ficheros locales, no filas de la base de datos. Con el
+  servidor en la nube y disco efímero, `data/uploads/` se pierde al redeploy: para
+  producción habría que moverlas a Supabase Storage o S3.
+- El plan gratuito de Supabase limita el número de conexiones: mantener
+  `ATLAS_DB_POOL` bajo (5 por defecto) y usar la cadena del *pooler* (puerto 6543).

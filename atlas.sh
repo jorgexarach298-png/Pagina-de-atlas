@@ -49,14 +49,23 @@ arrancar() {
 
   mkdir -p "$RAIZ/data"
   cd "$RAIZ" || exit 1
+
+  # La web no arranca sin PostgreSQL: se avisa antes de intentarlo.
+  if [ -z "${DATABASE_URL:-}" ] && [ -z "${ATLAS_DATABASE_URL:-}" ] && [ ! -f "$RAIZ/.env" ]; then
+    echo "Aviso: no hay DATABASE_URL ni fichero .env."
+    echo "  Copia .env.example a .env y pon ahi la cadena de conexion."
+    echo "  Para probar en local: DATABASE_URL=postgresql://atlas:...@127.0.0.1:5432/atlas"
+  fi
+
   # setsid + nohup: el servidor sigue vivo aunque se cierre esta terminal.
   PORT="$PUERTO" setsid nohup node server.js >"$LOG" 2>&1 < /dev/null &
   local pid=$!
   echo "$pid" > "$PIDFILE"
 
-  # Esperar a que responda, hasta 10 segundos.
+  # Esperar a que responda. Con la base de datos en la nube el arranque puede
+  # tardar unos segundos: se le dan hasta 30.
   local i
-  for i in $(seq 1 20); do
+  for i in $(seq 1 60); do
     if curl -s -o /dev/null --max-time 2 "http://localhost:$PUERTO/"; then
       echo "Arrancado en el puerto $PUERTO (PID $pid)."
       echo "  Local:   http://localhost:$PUERTO"
@@ -67,7 +76,7 @@ arrancar() {
     sleep 0.5
   done
 
-  echo "No respondio en 10 segundos. Ultimas lineas del log:"
+  echo "No respondio en 30 segundos. Ultimas lineas del log:"
   tail -20 "$LOG" 2>/dev/null
   return 1
 }

@@ -161,7 +161,7 @@ function openAccount() {
       state.user = updated;
       paintSession();
       toast('Foto actualizada');
-      close();
+      handle.close();
       reload();
     } catch (error) {
       toast(error.message, 'error');
@@ -174,7 +174,7 @@ function openAccount() {
       state.user = updated;
       paintSession();
       toast('Foto quitada');
-      close();
+      handle.close();
       reload();
     } catch (error) {
       toast(error.message, 'error');
@@ -253,6 +253,9 @@ async function render() {
     await route.render(ctx);
   } catch (error) {
     if (error.status === 401) {
+      // Se avisa antes de abrir el acceso, para que no parezca que la web
+      // «expulsa» sin más: casi siempre es que la sesión ha caducado.
+      toast('Tu sesión ha caducado. Vuelve a entrar.', 'error');
       $('#view').innerHTML = '<p class="loader">Sesión caducada. Vuelve a entrar.</p>';
       state.user = null;
       paintSession();
@@ -299,6 +302,17 @@ async function boot() {
   }
 
   window.addEventListener('hashchange', render);
+
+  // Si cualquier llamada se queda sin sesión (por ejemplo al subir una foto),
+  // se avisa y se pide entrar de nuevo en lugar de dejar la pantalla a medias.
+  window.addEventListener('atlas:unauthorized', () => {
+    if (!state.user) return;
+    state.user = null;
+    paintSession();
+    toast('Tu sesión ha caducado. Vuelve a entrar.', 'error');
+    openLogin(() => reload());
+  });
+
   await render();
 }
 
