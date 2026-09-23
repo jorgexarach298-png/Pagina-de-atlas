@@ -57,11 +57,16 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persisten
   screenshot salga oscuro.
 
 ## Autenticación
-- Admin por defecto: `admin` / `atlas-admin` (configurable con `ATLAS_ADMIN_USER`
-  y `ATLAS_ADMIN_PASSWORD`).
+- No hay registro público: la plantilla se siembra en el primer arranque y cada
+  miembro entra con el ID que ya figura en ella (`POST /api/auth/login`). El ID es
+  insensible a mayúsculas.
 - Contraseña inicial de cada miembro: `atlas` + su dorsal (p. ej. `atlas9`).
-- Cualquiera puede registrarse desde la pestaña «Registrarme» del formulario de
-  acceso (`POST /api/auth/register`), eligiendo ID, dorsal, posición y contraseña.
+- Los administradores son jugadores normales con `isAdmin: true` (no hay cuenta
+  `admin` aparte). En la semilla son `antoniogarciagal`, `RodriKTV`, `habixuelo75`
+  y `Angelotss`; el resto de jugadores no lo es.
+- `requireAdmin` protege la pizarra (guardar alineación), la plantilla (CRUD),
+  la historia y el check-in de otros. Como los admins son jugadores, siguen
+  contando en el check-in y firmando su propia respuesta.
 - El secreto de sesión se persiste en `data/session.key` para que los inicios de
   sesión sobrevivan a un reinicio; se puede sobrescribir con `SESSION_SECRET`.
 

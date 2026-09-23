@@ -127,43 +127,6 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
-/**
- * Registro de un miembro nuevo: crea su cuenta y lo deja con la sesión iniciada.
- * El dorsal y el ID son suyos; la posición la elige él mismo al entrar.
- */
-app.post(
-  '/api/auth/register',
-  asyncRoute(async (req, res) => {
-    const { username, number, position, displayName, password } = req.body || {};
-
-    const name = String(username || '').trim();
-    if (name.length < 3) {
-      return res.status(400).json({ error: 'El ID debe tener al menos 3 caracteres' });
-    }
-    if (String(password || '').length < 6) {
-      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
-    }
-    const dorsal = String(number || '').trim();
-    if (!/^\d{1,2}$/.test(dorsal)) {
-      return res.status(400).json({ error: 'El dorsal debe ser un número de 1 o 2 cifras' });
-    }
-
-    const player = store.createPlayer({
-      username: name,
-      number: dorsal,
-      position,
-      displayName,
-      password,
-    });
-
-    req.session.regenerate((error) => {
-      if (error) return res.status(500).json({ error: 'No se pudo iniciar sesión' });
-      req.session.playerId = player.id;
-      res.status(201).json({ user: player, today: store.todayISO() });
-    });
-  }),
-);
-
 app.post(
   '/api/auth/password',
   requireAuth,
@@ -185,11 +148,7 @@ app.post(
  * ------------------------------------------------------------------ */
 
 app.get('/api/roster', (req, res) => {
-  const players = store
-    .raw()
-    .players.filter((p) => !p.isAdmin)
-    .sort(store.playerSort)
-    .map(store.publicPlayer);
+  const players = [...store.raw().players].sort(store.playerSort).map(store.publicPlayer);
   res.json({ players, positions: store.POSITIONS, club: store.raw().club });
 });
 
@@ -307,9 +266,6 @@ app.get(
 );
 
 app.post('/api/checkin/me', requireAuth, asyncRoute(async (req, res) => {
-  if (req.player.isAdmin) {
-    return res.status(400).json({ error: 'La cuenta de administrador no cuenta para el check-in' });
-  }
   const { status, message, date } = req.body || {};
   const allowed = ['yes', 'no', 'late', 'maybe'];
   if (!allowed.includes(status)) return res.status(400).json({ error: 'Estado no válido' });
@@ -428,7 +384,12 @@ app.use((error, req, res, next) => {
 app.listen(PORT, HOST, () => {
   console.log(`⚽ ATLAS · FC27 Clubes Pro`);
   console.log(`   Servidor listo en http://localhost:${PORT}`);
-  console.log(`   Admin por defecto: ${store.raw().players.find((p) => p.isAdmin)?.username} / atlas-admin`);
+  const admins = store
+    .raw()
+    .players.filter((p) => p.isAdmin)
+    .map((p) => p.username)
+    .join(', ');
+  console.log(`   Admins: ${admins || 'ninguno'} (contraseña inicial atlas + dorsal)`);
 });
 
 module.exports = app;
