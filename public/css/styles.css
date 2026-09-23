@@ -629,6 +629,12 @@ img { display: block; max-width: 100%; }
   grid-template-columns: minmax(0, 1fr) 300px;
   align-items: start;
 }
+/* Sin `min-width: 0` los dos hijos mantienen su ancho mínimo de contenido y no
+   bajan del mismo: en el móvil la pista de una columna medía ~376px dentro de
+   un contenedor de 350px, así que el panel y el banquillo se salían de la
+   pantalla por la derecha y se veían cortados. */
+.board-shell,
+.board-tools { min-width: 0; }
 @media (max-width: 1020px) { .board-layout { grid-template-columns: 1fr; } }
 
 .board-shell {
@@ -765,7 +771,10 @@ img { display: block; max-width: 100%; }
   pointer-events: none;
 }
 .token__avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
-.token__avatar span {
+/* Solo el hueco de las iniciales ocupa todo el aro. `.token__num` es un `span`
+   hermano, así que sin `:not()` heredaba `width/height: 100%`: el dorsal tapaba
+   la foto con un disco dorado. */
+.token__avatar span:not(.token__num) {
   display: grid;
   place-items: center;
   width: 100%; height: 100%;
@@ -892,7 +901,8 @@ img { display: block; max-width: 100%; }
 .bench__avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .bench__name { flex: 1; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.03em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bench__pos { font-size: 0.68rem; letter-spacing: 0.1em; color: var(--dim); }
+.bench__pos { font-size: 0.68rem; letter-spacing: 0.1em; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .board-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .board-meta { font-size: 0.78rem; color: var(--dim); }

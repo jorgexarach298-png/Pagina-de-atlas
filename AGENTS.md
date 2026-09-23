@@ -97,6 +97,15 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) + persisten
 - El aro de cada ficha refleja la convocatoria del día (`token--yes`/`no`/`late`/
   `maybe`). Ese dato solo se envía a quien ha iniciado sesión: la pizarra es
   pública, pero quién viene al partido no.
+- La foto del jugador se pinta dentro del aro (`.token__avatar img`) y el dorsal
+  queda como insignia. El selector del hueco de iniciales es
+  `.token__avatar span:not(.token__num)`: al ser `.token__num` un `span` hermano,
+  un `.token__avatar span` a secas le daba `width/height: 100%` y el dorsal
+  tapaba la foto entera con un disco dorado.
+- `.board-shell` y `.board-tools` llevan `min-width: 0`. Sin ello, como hijos de
+  una rejilla, conservan su ancho mínimo de contenido (~376px) y en el móvil el
+  panel y el banquillo se salían de la pantalla por la derecha y se veían
+  cortados.
 
 ## Arrancar y parar
 
