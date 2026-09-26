@@ -41,6 +41,13 @@ export const api = {
     request('GET', `/api/lineup${date ? `?date=${encodeURIComponent(date)}` : ''}`),
   saveLineup: (lineup) => request('PUT', '/api/lineup', lineup),
 
+  // Ayudas y pruebas: fichas de gente de fuera para completar el once. Solo el
+  // mánager las ve y las gestiona; no son miembros de la plantilla.
+  guests: () => request('GET', '/api/guests'),
+  createGuest: (name) => request('POST', '/api/guests', { name }),
+  updateGuest: (id, patch) => request('PATCH', `/api/guests/${id}`, patch),
+  deleteGuest: (id) => request('DELETE', `/api/guests/${id}`),
+
   publishMatch: (date, payload) => request('POST', `/api/matches/${date}/publish`, payload),
   unpublishMatch: (date) => request('DELETE', `/api/matches/${date}`),
   matches: () => request('GET', '/api/matches'),

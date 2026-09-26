@@ -33,6 +33,11 @@
   --ok-deep: #2f8751;
   --ok-glow: rgba(76, 175, 114, 0.32);
 
+  /* Violeta para las ayudas de fuera: ni verde de confirmado ni un color de
+     marca, para que se distingan de un vistazo en el campo. */
+  --guest: #a37ce0;
+  --guest-deep: #7c53bf;
+
   --display: 'Cinzel', 'Times New Roman', serif;
   --cond: 'Saira Condensed', 'Arial Narrow', sans-serif;
   --body: 'Manrope', system-ui, sans-serif;
@@ -801,6 +806,24 @@ img { display: block; max-width: 100%; }
 .token--late { --tone: var(--amber); }
 .token--maybe { --tone: var(--sky); }
 .token--pending { --tone: var(--muted); }
+/* Las ayudas no firman check-in: su aro es propio y discontinuo, para que se
+   vean como lo que son (alguien de fuera) y no como un estado de convocatoria. */
+.token--guest { --tone: var(--guest); }
+.token--guest .token__avatar { border-style: dashed; }
+.token__tag {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px 999px 0 0;
+  background: var(--guest);
+  color: #10061a;
+  font-family: var(--cond);
+  font-weight: 800;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
 
 .token__avatar {
   position: relative;
@@ -1462,6 +1485,9 @@ img { display: block; max-width: 100%; }
   flex-direction: column;
   gap: 0.6rem;
   max-width: min(360px, calc(100vw - 2.4rem));
+  /* Los avisos solo informan y no tienen nada que pulsar: si capturaran el
+     ratón, taparían durante unos segundos lo que hubiera debajo. */
+  pointer-events: none;
 }
 .toast {
   padding: 0.75rem 1rem;
@@ -1549,6 +1575,70 @@ img { display: block; max-width: 100%; }
 
 .reveal { animation: reveal 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) backwards; }
 @keyframes reveal { from { opacity: 0; transform: translateY(14px); } }
+
+/* ---------------------------------------------- Ayudas y pruebas (pizarra) */
+
+.guest-add {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+.guest-add .input { flex: 1; min-width: 0; }
+
+.guest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: min(30vh, 260px);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+.guest-item {
+  /* Igual que el banquillo: el dedo desplaza la lista, no arrastra la ficha. */
+  touch-action: pan-y;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--guest);
+  border-radius: var(--radius-sm);
+  background: rgba(11, 17, 28, 0.72);
+  cursor: grab;
+}
+.guest-item:active { cursor: grabbing; }
+.guest-item:hover { border-color: var(--guest); background: rgba(163, 124, 224, 0.1); }
+.guest-item.is-placed { opacity: 0.45; }
+.guest-item.is-dragging { opacity: 0.6; }
+.guest-item__avatar {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--ink-600);
+  border: 2px dashed var(--guest);
+  color: var(--guest);
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+.guest-item__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.guest-item__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.guest-item__name {
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guest-item__pos { color: var(--guest); font-size: 0.72rem; }
+.guest-item__tools { display: flex; gap: 0.15rem; align-items: center; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

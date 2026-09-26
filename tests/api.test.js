@@ -364,6 +364,100 @@ async function login(username, password) {
     JSON.stringify(resumed.json?.user?.username),
   );
 
+  /* ---------------------------------------------- Ayudas y pruebas */
+
+  // Una ayuda es gente de fuera que completa el once: no es plantilla, no tiene
+  // cuenta y no debe colarse ni en las cartas ni en el check-in.
+  const guestName = 'Invitado de prueba';
+  const newGuest = await call('POST', '/api/guests', { body: { name: guestName }, jar: admin.jar });
+  check('el mánager añade una ayuda', newGuest.status === 201, `status ${newGuest.status} ${newGuest.text.slice(0, 120)}`);
+  const guestId = newGuest.json?.guest?.id;
+  check('la ayuda se marca como de fuera y no como jugador', newGuest.json?.guest?.isGuest === true && newGuest.json?.guest?.isPlayer === false);
+
+  const againGuest = await call('POST', '/api/guests', { body: { name: guestName }, jar: admin.jar });
+  check(
+    'repetir el nombre reutiliza la misma ficha',
+    againGuest.status === 200 && againGuest.json?.guest?.id === guestId,
+    `status ${againGuest.status}`,
+  );
+
+  const secondGuest = await call('POST', '/api/guests', { body: { name: 'Segundo invitado' }, jar: admin.jar });
+  check('puede haber varias ayudas a la vez', secondGuest.status === 201 && secondGuest.json?.guest?.id !== guestId);
+
+  const guestList = await call('GET', '/api/guests', { jar: admin.jar });
+  check('la lista de ayudas trae las dos', (guestList.json?.guests || []).length === 2, `${(guestList.json?.guests || []).length}`);
+
+  const guestAsPlayer = await call('POST', '/api/guests', { body: { name: 'Cuela que no' }, jar: playerJar });
+  check('un jugador no puede añadir ayudas', guestAsPlayer.status === 403, `status ${guestAsPlayer.status}`);
+
+  const rosterWithGuest = await call('GET', '/api/roster');
+  check(
+    'la ayuda no aparece en las cartas de la plantilla',
+    !(rosterWithGuest.json?.players || []).some((p) => p.id === guestId),
+  );
+
+  const checkinWithGuest = await call('GET', `/api/checkin?date=${date}`, { jar: admin.jar });
+  check(
+    'la ayuda no entra en la lista de check-in',
+    !(checkinWithGuest.json?.roster || []).some((r) => r.player.id === guestId),
+  );
+
+  const guestLogin = await login(newGuest.json?.guest?.username, 'lo-que-sea-123');
+  check('una ayuda no puede iniciar sesión', guestLogin.status === 401, `status ${guestLogin.status}`);
+
+  const available = await call('GET', '/api/auth/available');
+  check(
+    'una ayuda no aparece como ID pendiente de registro',
+    !(available.json?.pending || []).some((p) => p.id === guestId || p.username === guestName),
+  );
+
+  const renamed = await call('PATCH', `/api/guests/${guestId}`, {
+    body: { name: 'Invitado renombrado' },
+    jar: admin.jar,
+  });
+  check(
+    'renombrar conserva la ficha',
+    renamed.status === 200 && renamed.json?.guest?.id === guestId && renamed.json?.guest?.displayName === 'Invitado renombrado',
+    `status ${renamed.status}`,
+  );
+
+  // El once admite ayudas junto a la plantilla: son fichas del campo igual.
+  const itemsWithGuest = [...items, { playerId: guestId, x: 0.5, y: 0.1, vertical: true }];
+  const publishedWithGuest = await call('POST', `/api/matches/${date}/publish`, {
+    body: { formation: '4-3-3', items: itemsWithGuest },
+    jar: admin.jar,
+  });
+  check('se puede publicar un once con una ayuda', publishedWithGuest.status === 200, `status ${publishedWithGuest.status}`);
+  check(
+    'la ayuda queda entre las fichas del once',
+    (publishedWithGuest.json?.match?.items || []).some((i) => i.playerId === guestId),
+  );
+
+  const lineupWithGuest = await call('GET', `/api/lineup?date=${date}`);
+  check(
+    'la pizarra pública recibe la ayuda del once para poder pintarla',
+    (lineupWithGuest.json?.guests || []).some((g) => g.id === guestId),
+    JSON.stringify((lineupWithGuest.json?.guests || []).map((g) => g.id)),
+  );
+
+  const voteGuest = await call('POST', `/api/matches/${date}/ratings`, {
+    body: { scores: { [guestId]: 11 } },
+    jar: playerJar,
+  });
+  check(
+    'no se puede puntuar a una ayuda',
+    voteGuest.status === 200 && Object.keys(voteGuest.json?.match?.myScores || {}).length === 0,
+    `status ${voteGuest.status}`,
+  );
+
+  const removedGuest = await call('DELETE', `/api/guests/${guestId}`, { jar: admin.jar });
+  check('el mánager borra una ayuda', removedGuest.status === 200, `status ${removedGuest.status}`);
+  const lineupAfterDelete = await call('GET', `/api/lineup?date=${date}`);
+  check(
+    'la ayuda borrada desaparece de la pizarra',
+    !(lineupAfterDelete.json?.guests || []).some((g) => g.id === guestId),
+  );
+
   /* ---------------------------------------------- Limpieza */
 
   const unpublish = await call('DELETE', `/api/matches/${date}`, { jar: admin.jar });

@@ -1,9 +1,14 @@
 'use strict';
 
 import { api } from '../api.js';
-import { $, escapeHtml, initials, toast, confirmAction, todayISO, hashParam } from '../utils.js';
+import {
+  $, escapeHtml, html, initials, toast, confirmAction, pickPhoto, openModal, todayISO, hashParam,
+} from '../utils.js';
 
 const BENCH_ORDER = ['POR', 'DFC', 'LI', 'LD', 'MC', 'DC'];
+
+/** Zona donde cae una ayuda al subirla: al no tener posición, va al centro. */
+const GUEST_ZONE = 'MC';
 
 /** Etiqueta y tono de cada estado de convocatoria. */
 const STATUS_LABEL = {
@@ -80,25 +85,38 @@ export async function renderPizarra(ctx) {
     // El mánager abre la jornada publicando el once; hasta entonces no hay notas.
     const match = data.match || { published: false };
 
+    // Ayudas y pruebas: fichas de gente de fuera. Al mánager le llega su lista
+    // completa para gestionarlas; al resto, solo las que están en el once que
+    // ve, para poder pintar el campo.
+    let guests = data.guests || [];
+
     if (!players.length) {
       ctx.outlet.innerHTML =
         '<p class="empty-state"><b>Sin jugadores</b>Añade miembros a la plantilla para colocarlos en el campo.</p>';
       return;
     }
 
+    /**
+     * Las ayudas no son de la plantilla, pero ocupan una ficha igual: donde se
+     * resuelve un id del campo hay que mirar en las dos listas.
+     */
+    const personById = (id) => players.find((p) => p.id === id) || guests.find((g) => g.id === id) || null;
+    const isGuest = (id) => guests.some((g) => g.id === id);
+
     const slots = new Map();
     // Quien no es mánager ve el once publicado; el mánager trabaja sobre su
     // borrador, que puede tener cambios todavía sin publicar.
     const sourceItems = !isAdmin && match.published ? match.items : data.lineup.items;
     for (const item of sourceItems || []) {
-      if (players.some((p) => p.id === item.playerId)) slots.set(item.playerId, migrateSlot(item));
+      if (personById(item.playerId)) slots.set(item.playerId, migrateSlot(item));
     }
 
     // Notas que este jugador ya puso ese día (voto propio, no se enseña al resto).
     const myScores = { ...(match.myScores || {}) };
 
-    const toneOf = (playerId) => STATUS_LABEL[statuses[playerId]]?.tone || 'pending';
-    const labelOf = (playerId) => STATUS_LABEL[statuses[playerId]]?.label || 'Sin responder';
+    const toneOf = (playerId) => (isGuest(playerId) ? 'guest' : STATUS_LABEL[statuses[playerId]]?.tone || 'pending');
+    const labelOf = (playerId) =>
+      isGuest(playerId) ? 'Ayuda de fuera' : STATUS_LABEL[statuses[playerId]]?.label || 'Sin responder';
 
     ctx.outlet.innerHTML = `
       <section class="section" style="margin-top:0">
@@ -157,6 +175,23 @@ export async function renderPizarra(ctx) {
               }
               <div class="bench" id="bench"></div>
             </div>
+
+            ${
+              isAdmin
+                ? `<div class="panel">
+                     <h3 class="panel__title">Ayudas y pruebas</h3>
+                     <p class="login-hint" style="margin:0 0 .6rem">
+                       Gente de fuera que completa el once. No son de la plantilla: no salen en las
+                       cartas, no firman check-in y no reciben notas.
+                     </p>
+                     <div class="guest-add">
+                       <input class="input" id="guest-name" placeholder="Nombre de la ayuda" maxlength="40" />
+                       <button class="btn btn--primary btn--sm" id="guest-add">＋ Añadir</button>
+                     </div>
+                     <div class="guest-list" id="guest-list"></div>
+                   </div>`
+                : ''
+            }
 
             <div class="panel" id="rating-panel">
               <h3 class="panel__title">Notas del día</h3>
@@ -337,21 +372,216 @@ export async function renderPizarra(ctx) {
       });
     };
 
+    /**
+     * Panel de ayudas. Cada ayuda se puede subir al campo (o bajar), cambiarle
+     * el nombre y ponerle foto; borrarla la quita también del campo.
+     */
+    const renderGuests = () => {
+      const host = $('#guest-list', ctx.outlet);
+      if (!host) return;
+
+      if (!guests.length) {
+        host.innerHTML = '<p class="login-hint" style="margin:0">Todavía no hay ninguna. Escribe un nombre y pulsa «Añadir».</p>';
+        return;
+      }
+
+      host.innerHTML = guests
+        .map((guest) => {
+          const placed = slots.has(guest.id);
+          return `
+          <div class="guest-item ${placed ? 'is-placed' : ''}" data-guest="${escapeHtml(guest.id)}">
+            <span class="guest-item__avatar">
+              ${
+                guest.photo
+                  ? `<img src="${escapeHtml(guest.photo)}" alt="" draggable="false" />`
+                  : `<span>${escapeHtml(initials(guest.displayName))}</span>`
+              }
+            </span>
+            <span class="guest-item__body">
+              <span class="guest-item__name">${escapeHtml(guest.displayName)}</span>
+              <span class="guest-item__pos">${escapeHtml(labelOf(guest.id))}</span>
+            </span>
+            <span class="guest-item__tools">
+              ${
+                placed
+                  ? `<button class="btn btn--sm btn--ghost" data-guest-remove="${escapeHtml(
+                      guest.id,
+                    )}" title="Bajar al banquillo">Bajar</button>`
+                  : `<button class="btn btn--sm btn--ghost" data-guest-add="${escapeHtml(
+                      guest.id,
+                    )}" title="Subir al campo">Añadir</button>`
+              }
+              <button class="btn btn--sm btn--ghost" data-guest-photo="${escapeHtml(
+                guest.id,
+              )}" title="Poner foto">Foto</button>
+              <button class="btn btn--sm btn--ghost" data-guest-edit="${escapeHtml(
+                guest.id,
+              )}" title="Cambiar el nombre">✎</button>
+            </span>
+          </div>
+        `;
+        })
+        .join('');
+
+      host.querySelectorAll('[data-guest-add]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const guest = guests.find((g) => g.id === button.dataset.guestAdd);
+          if (!guest) return;
+          slots.set(guest.id, freeSpot(ZONE[GUEST_ZONE]));
+          selectedId = null;
+          renderAll();
+          markDirty();
+        });
+      });
+
+      host.querySelectorAll('[data-guest-remove]').forEach((button) => {
+        button.addEventListener('click', () => {
+          slots.delete(button.dataset.guestRemove);
+          if (selectedId === button.dataset.guestRemove) selectedId = null;
+          renderAll();
+          markDirty();
+        });
+      });
+
+      host.querySelectorAll('[data-guest-photo]').forEach((button) => {
+        button.addEventListener('click', () => uploadGuestPhoto(button.dataset.guestPhoto));
+      });
+
+      host.querySelectorAll('[data-guest-edit]').forEach((button) => {
+        button.addEventListener('click', () => editGuest(button.dataset.guestEdit));
+      });
+
+      // Arrastrar una ayuda al campo, igual que una carta de la plantilla.
+      host.querySelectorAll('[data-guest]').forEach((item) => {
+        item.addEventListener('pointerdown', (event) => {
+          if (event.target.closest('button')) return;
+          startDragFromBench(event, item, item.dataset.guest, {
+            soloTap: event.pointerType === 'touch' && !event.target.closest('.guest-item__avatar'),
+          });
+        });
+      });
+    };
+
+    /** Añade una ayuda por nombre. Si ya existía, la reutiliza. */
+    const addGuest = async () => {
+      const input = $('#guest-name', ctx.outlet);
+      const name = input?.value.trim();
+      if (!name) {
+        toast('Escribe el nombre de la ayuda', 'error');
+        return;
+      }
+      try {
+        const { guest } = await api.createGuest(name);
+        const known = guests.some((g) => g.id === guest.id);
+        // Se toca solo la lista de ayudas: recargar la pizarra entera tiraría
+        // las cartas que el mánager ya haya colocado sin guardar.
+        if (!known) guests = [...guests, guest];
+        input.value = '';
+        renderGuests();
+        toast(known ? `«${guest.displayName}» ya estaba en la lista` : `Ayuda «${guest.displayName}» añadida`);
+      } catch (error) {
+        toast(error.message, 'error');
+      }
+    };
+
+    /** Sube la foto de una ayuda y refresca su ficha, sin tocar el campo. */
+    async function uploadGuestPhoto(guestId) {
+      try {
+        const dataUrl = await pickPhoto();
+        if (!dataUrl) return;
+        const { guest } = await api.updateGuest(guestId, { photo: dataUrl });
+        guests = guests.map((g) => (g.id === guestId ? { ...g, photo: guest.photo } : g));
+        renderGuests();
+        renderTokens();
+        toast('Foto de la ayuda actualizada');
+      } catch (error) {
+        toast(error.message, 'error');
+      }
+    }
+
+    function editGuest(guestId) {
+      const guest = guests.find((g) => g.id === guestId);
+      if (!guest) return;
+
+      const form = html(`
+        <div class="field">
+          <label for="eg-name">Nombre de la ayuda</label>
+          <input class="input" id="eg-name" value="${escapeHtml(guest.displayName)}" maxlength="40" />
+          <p class="login-hint">Cambiar el nombre conserva su ficha en el campo y lo ya anotado.</p>
+        </div>
+      `);
+
+      openModal({
+        title: `Ayuda: ${guest.displayName}`,
+        body: form,
+        actions: [
+          { label: 'Cancelar', variant: 'ghost' },
+          {
+            label: 'Eliminar',
+            variant: 'danger',
+            onClick: async ({ close }) => {
+              if (
+                !(await confirmAction(
+                  `¿Borrar la ayuda «${guest.displayName}»? Se quitará del campo y de las alineaciones guardadas.`,
+                ))
+              ) {
+                return false;
+              }
+              try {
+                await api.deleteGuest(guest.id);
+                guests = guests.filter((g) => g.id !== guest.id);
+                slots.delete(guest.id);
+                if (selectedId === guest.id) selectedId = null;
+                close();
+                renderAll();
+                toast('Ayuda eliminada');
+              } catch (error) {
+                toast(error.message, 'error');
+              }
+              return false;
+            },
+          },
+          {
+            label: 'Guardar',
+            variant: 'primary',
+            onClick: async ({ close }) => {
+              try {
+                const { guest: saved } = await api.updateGuest(guest.id, {
+                  name: $('#eg-name', form).value,
+                });
+                guests = guests.map((g) => (g.id === guest.id ? { ...g, ...saved } : g));
+                close();
+                renderAll();
+                toast('Ayuda actualizada');
+              } catch (error) {
+                toast(error.message, 'error');
+                return false;
+              }
+              return true;
+            },
+          },
+        ],
+      });
+    }
+
     const renderTokens = () => {
       board.querySelectorAll('.token').forEach((token) => token.remove());
       for (const [playerId, slot] of slots) {
-        const player = players.find((p) => p.id === playerId);
+        const player = personById(playerId);
         if (!player) continue;
 
+        const guest = isGuest(playerId);
         const token = document.createElement('button');
         token.type = 'button';
-        token.className = `token token--${toneOf(playerId)} ${
+        token.className = `token token--${toneOf(playerId)} ${guest ? 'token--guest' : ''} ${
           selectedId === playerId ? 'is-selected' : ''
         }`;
         token.dataset.player = playerId;
         token.style.left = `${slot.x * 100}%`;
         token.style.top = `${slot.y * 100}%`;
-        token.title = `${player.displayName} · ${primaryPosition(player)} · ${labelOf(playerId)}`;
+        token.title = guest
+          ? `${player.displayName} · Ayuda de fuera`
+          : `${player.displayName} · ${primaryPosition(player)} · ${labelOf(playerId)}`;
         token.innerHTML = `
           <span class="token__avatar">
             ${
@@ -359,7 +589,7 @@ export async function renderPizarra(ctx) {
                 ? `<img src="${escapeHtml(player.photo)}" alt="" draggable="false" />`
                 : `<span>${escapeHtml(initials(player.displayName))}</span>`
             }
-            <span class="token__num">${escapeHtml(player.number)}</span>
+            ${guest ? '<span class="token__tag">AYUDA</span>' : `<span class="token__num">${escapeHtml(player.number)}</span>`}
           </span>
           <span class="token__name">${escapeHtml(player.displayName)}</span>
         `;
@@ -374,6 +604,7 @@ export async function renderPizarra(ctx) {
     const renderAll = () => {
       renderTokens();
       renderBench();
+      renderGuests();
       renderLegend();
       renderRatings();
     };
@@ -632,8 +863,8 @@ export async function renderPizarra(ctx) {
           if (soloTap) return;
           ghost = document.createElement('div');
           ghost.className = 'token-ghost';
-          const player = players.find((p) => p.id === playerId);
-          ghost.textContent = player ? player.number : '';
+          const player = personById(playerId);
+          ghost.textContent = player ? (isGuest(playerId) ? '★' : player.number) : '';
           board.append(ghost);
         }
         if (soloTap) return;
@@ -759,6 +990,14 @@ export async function renderPizarra(ctx) {
     }
 
     if (isAdmin) {
+      // Alta de ayuda: con el botón o pulsando Enter en el campo del nombre.
+      $('#guest-add', ctx.outlet)?.addEventListener('click', addGuest);
+      $('#guest-name', ctx.outlet)?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        addGuest();
+      });
+
       $('#save-board', ctx.outlet).addEventListener('click', async () => {
         try {
           await api.saveLineup({

@@ -313,6 +313,7 @@ app.get(
     // La convocatoria solo se envía a quien ha iniciado sesión: la pizarra es
     // pública, pero quién viene al partido no tiene por qué serlo.
     const viewer = await currentUser(req);
+    const isAdmin = Boolean(viewer?.isAdmin);
     const [lineup, roster, match] = await Promise.all([
       store.getLineup(),
       store.listRoster(),
@@ -335,6 +336,18 @@ app.get(
         photo: p.photo,
         claimed: Boolean(p.claimed),
       })),
+      // Las ayudas solo las gestiona el mánager. Al resto se le mandan
+      // únicamente las que aparecen en el once que va a ver, para que una ayuda
+      // publicada no desaparezca del campo (el nombre ya se ve en la ficha).
+      guests: await (async () => {
+        const all = await store.listGuests();
+        const guestView = (g) => ({ id: g.id, displayName: g.displayName, photo: g.photo });
+        if (isAdmin) return all.map(guestView);
+        // Quien no es mánager ve el once publicado; si aún no lo hay, el borrador.
+        const shown = (match.published ? match.items : lineup.items) || [];
+        const visible = new Set(shown.map((item) => item.playerId));
+        return all.filter((g) => visible.has(g.id)).map(guestView);
+      })(),
     });
   }),
 );
@@ -345,6 +358,62 @@ app.put(
   asyncRoute(async (req, res) => {
     const lineup = await store.saveLineup(req.body || {});
     res.json({ lineup });
+  }),
+);
+
+/**
+ * Ayudas y pruebas: gente de fuera que completa el once. No son miembros de la
+ * plantilla, así que estas rutas son solo del mánager y no tocan el check-in ni
+ * las cartas. Repetir un nombre reutiliza la misma ficha.
+ */
+app.get(
+  '/api/guests',
+  requireAdmin,
+  asyncRoute(async (req, res) => {
+    const guests = await store.listGuests();
+    res.json({ guests: guests.map((g) => store.publicPlayer(g)) });
+  }),
+);
+
+app.post(
+  '/api/guests',
+  requireAdmin,
+  asyncRoute(async (req, res) => {
+    const { guest, created } = await store.ensureGuest(req.body?.name);
+    res.status(created ? 201 : 200).json({ guest });
+  }),
+);
+
+app.patch(
+  '/api/guests/:id',
+  requireAdmin,
+  asyncRoute(async (req, res) => {
+    const { name, photo } = req.body || {};
+
+    // El nombre y la foto llegan del mismo formulario, así que se aplican los
+    // dos si vienen; cada uno se salta si no se ha tocado.
+    if (name !== undefined) await store.renameGuest(req.params.id, name);
+    if (photo !== undefined) {
+      const current = await store.findPlayerById(req.params.id);
+      if (!current?.isGuest) return res.status(404).json({ error: 'Esa ayuda no existe' });
+      const saved = photo
+        ? uploads.replaceUpload(current.photo, photo)
+        : (uploads.removeUpload(current.photo), null);
+      await store.setGuestPhoto(req.params.id, saved);
+    }
+
+    const guest = await store.findPlayerById(req.params.id);
+    res.json({ guest: store.publicPlayer(guest) });
+  }),
+);
+
+app.delete(
+  '/api/guests/:id',
+  requireAdmin,
+  asyncRoute(async (req, res) => {
+    const removed = await store.deleteGuest(req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Esa ayuda no existe' });
+    res.json({ ok: true });
   }),
 );
 

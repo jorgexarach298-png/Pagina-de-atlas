@@ -179,6 +179,51 @@ async function login(page, username, password) {
     const publishLabel = await adminPage.$eval('#publish-board', (el) => el.textContent.trim());
     check('el botón invita a publicar el once', /Publicar once del día/i.test(publishLabel), publishLabel);
 
+    /* ------------------------------------------------ Ayudas y pruebas */
+
+    // El mánager tiene su panel para gente de fuera; es una herramienta suya,
+    // no un apartado del equipo.
+    check('el mánager ve el panel de ayudas', Boolean(await adminPage.$('#guest-list')), 'sin panel');
+    check('el panel ofrece el campo para el nombre', Boolean(await adminPage.$('#guest-name')), 'sin campo');
+
+    await adminPage.type('#guest-name', 'Invitado de interfaz');
+    await adminPage.click('#guest-add');
+    await waitToast(adminPage, /añadida|ya estaba/i);
+
+    const guestRows = await adminPage.$$eval('.guest-item', (els) =>
+      els.map((el) => el.querySelector('.guest-item__name').textContent.trim()),
+    );
+    check('la ayuda aparece en su lista', guestRows.includes('Invitado de interfaz'), guestRows.join(','));
+
+    const benchNames = await adminPage.$$eval('.bench__item', (els) =>
+      els.map((el) => el.textContent.trim()),
+    );
+    check(
+      'la ayuda no se cuela en el banquillo de la plantilla',
+      !benchNames.some((t) => t.includes('Invitado de interfaz')),
+      'aparece en el banquillo',
+    );
+
+    // Subirla al campo: ocupa una ficha con su nombre y se marca como ayuda.
+    await adminPage.click('[data-guest-add]');
+    await sleep(250);
+    const guestToken = await adminPage.$eval('.token--guest', (el) => ({
+      name: el.querySelector('.token__name').textContent.trim(),
+      tag: el.querySelector('.token__tag')?.textContent.trim(),
+      hasNumber: Boolean(el.querySelector('.token__num')),
+    }));
+    check('la ayuda se coloca en el campo con su nombre', guestToken.name === 'Invitado de interfaz', guestToken.name);
+    check('la ficha de la ayuda se distingue con su etiqueta', guestToken.tag === 'AYUDA', `${guestToken.tag}`);
+    check('la ficha de la ayuda no lleva dorsal', guestToken.hasNumber === false, 'lleva dorsal');
+
+    const tokensWithGuest = await adminPage.$$eval('.token', (els) => els.length);
+    check('la ayuda convive con las cartas del once', tokensWithGuest === 5, `${tokensWithGuest}`);
+
+    // Y se puede bajar sin borrarla de la lista.
+    await adminPage.click('[data-guest-remove]');
+    await sleep(250);
+    check('bajar la ayuda la quita del campo', (await adminPage.$$('.token--guest')).length === 0);
+
     /* ------------------------------------------------ El candidato se registra */
 
     const context = await browser.createBrowserContext();
