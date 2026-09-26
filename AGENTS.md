@@ -181,6 +181,27 @@ Node/Express + SPA en JavaScript puro (sin build step ni frameworks) +
 - El aro de cada ficha refleja la convocatoria del día (`token--yes`/`no`/`late`/
   `maybe`). Ese dato solo se envía a quien ha iniciado sesión: la pizarra es
   pública, pero quién viene al partido no.
+- Los **avisos flotantes** (`.toasts`) llevan `pointer-events: none`. No tienen nada
+  que pulsar y, al estar fijos abajo a la derecha, se comían los clics de lo que
+  quedara debajo (el botón «Añadir» de las ayudas, por ejemplo) durante los 3,6 s
+  que duran. Si algún aviso necesita botones, habrá que devolverles el `auto`.
+
+### Ayudas y pruebas
+- Son gente de fuera que completa el once. Viven en `players` con `is_guest = true`
+  para que la alineación publicada pueda referenciarlas con la misma clave foránea,
+  pero **no son plantilla**: llevan `is_player = false`, contraseña aleatoria que
+  nadie conoce (así no entran ni se activan desde «Registrarme»), y quedan fuera del
+  roster, del check-in y de las notas. Al filtrar plantilla, `is_player` sigue siendo
+  el criterio; `is_guest` solo decide cómo se pinta la ficha.
+- `ensureGuest()` reutiliza la ficha si se repite el nombre (`lower(display_name)`),
+  así que añadir dos veces «Juan» no duplica nada.
+- `GET /api/lineup` manda al mánager la lista entera de ayudas y al resto solo las
+  que están en el once que ve. El panel de gestión es solo del mánager.
+- Al añadir o renombrar una ayuda, `pizarra.js` **actualiza su lista en memoria** en
+  vez de llamar a `load()`: recargar la pizarra entera tiraba las cartas que el
+  mánager ya hubiera colocado sin publicar.
+- `rosterStats()` recorre solo el roster, así que las ayudas no suman partidos ni
+  estadísticas a nadie.
 
 ## Arrancar y parar
 
